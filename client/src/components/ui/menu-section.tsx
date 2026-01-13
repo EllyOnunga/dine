@@ -31,60 +31,102 @@ const menuItems = [
 
 export function MenuSection() {
   return (
-    <section id="menu" className="py-24 bg-background">
+    <section id="menu" className="py-24 bg-background overflow-hidden">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <span className="text-primary font-medium tracking-widest uppercase text-sm mb-2 block">
+          <motion.span 
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-primary font-medium tracking-widest uppercase text-sm mb-2 block"
+          >
             Discover Our Flavors
-          </span>
-          <h2 className="text-4xl md:text-5xl font-serif font-bold text-foreground">
+          </motion.span>
+          <motion.h2 
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="text-4xl md:text-5xl font-serif font-bold text-foreground"
+          >
             The Menu
-          </h2>
-          <div className="w-24 h-1 bg-primary mx-auto mt-6" />
+          </motion.h2>
+          <motion.div 
+            initial={{ width: 0 }}
+            whileInView={{ width: 96 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2, duration: 0.8 }}
+            className="h-1 bg-primary mx-auto mt-6" 
+          />
         </div>
 
-        <div className="grid md:grid-cols-2 gap-12 lg:gap-24 max-w-6xl mx-auto">
-          {menuItems.map((category, idx) => (
-            <motion.div
-              key={category.category}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: idx * 0.2 }}
-            >
-              <h3 className="text-2xl font-serif font-semibold mb-8 border-b border-border pb-4 flex justify-between items-baseline text-primary">
+        <div className="space-y-24 max-w-6xl mx-auto">
+          {menuItems.map((category, catIdx) => (
+            <div key={category.category}>
+              <motion.h3 
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className="text-3xl font-serif font-semibold mb-12 flex items-center gap-4 text-primary"
+              >
                 {category.category}
-              </h3>
-              <div className="space-y-12">
-                {category.items.map((item) => (
-                  <div key={item.name} className="group flex flex-col sm:flex-row gap-6 items-start">
-                    <div className="relative h-32 w-full sm:w-32 shrink-0 overflow-hidden rounded-lg shadow-md border border-border/50 transition-transform duration-500 group-hover:scale-105">
-                      <img 
-                        src={item.image} 
-                        alt={item.name} 
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between items-baseline mb-2">
-                        <h4 className="text-xl font-serif font-bold group-hover:text-primary transition-colors flex items-center flex-wrap gap-2">
-                          {item.name}
-                          {item.tag && (
-                            <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal border-primary/50 text-primary bg-primary/5">
+                <div className="h-[1px] flex-1 bg-border/50" />
+              </motion.h3>
+              
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {category.items.map((item, itemIdx) => (
+                  <motion.div
+                    key={item.name}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    transition={{ 
+                      duration: 0.6, 
+                      delay: itemIdx * 0.1,
+                      ease: "easeOut" 
+                    }}
+                  >
+                    <Card className="group h-full border-border/50 bg-card hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 overflow-hidden">
+                      <div className="relative h-56 overflow-hidden">
+                        <motion.img 
+                          src={item.image} 
+                          alt={item.name} 
+                          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                        <div className="absolute top-4 right-4">
+                           {item.tag && (
+                            <Badge className="bg-primary text-white border-none shadow-lg">
                               {item.tag}
                             </Badge>
                           )}
-                        </h4>
-                        <span className="text-lg font-serif italic text-primary ml-4">{item.price}</span>
+                        </div>
                       </div>
-                      <p className="text-muted-foreground text-sm leading-relaxed italic">
-                        {item.description}
-                      </p>
-                    </div>
-                  </div>
+                      <CardContent className="p-6">
+                        <div className="flex justify-between items-start mb-3">
+                          <h4 className="text-xl font-serif font-bold group-hover:text-primary transition-colors">
+                            {item.name}
+                          </h4>
+                          <span className="text-lg font-serif font-semibold text-primary">{item.price}</span>
+                        </div>
+                        <p className="text-muted-foreground text-sm leading-relaxed line-clamp-2 italic">
+                          {item.description}
+                        </p>
+                        <div className="mt-6 pt-4 border-t border-border/50 flex justify-between items-center">
+                          <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Chef's Special</span>
+                          <motion.div 
+                            whileHover={{ x: 5 }}
+                            className="text-primary cursor-pointer"
+                          >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                          </motion.div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
                 ))}
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>
