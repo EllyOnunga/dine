@@ -1,16 +1,14 @@
-import { Navbar } from "@/components/ui/navbar";
 import { Hero } from "@/components/ui/hero";
 import { MenuSection } from "@/components/ui/menu-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Clock, MapPin, Phone } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-background font-sans text-foreground selection:bg-primary/20">
-      <Navbar />
-      
       <main>
         <Hero />
         
@@ -48,15 +46,15 @@ export default function Home() {
                 </div>
 
                 <div className="flex gap-4">
-                  <Input type="email" placeholder="Enter your email for updates" className="max-w-xs" />
-                  <Button>Subscribe</Button>
+                  <Link href="/reservations">
+                    <Button size="lg" className="font-serif italic">Make a Reservation</Button>
+                  </Link>
                 </div>
               </div>
 
               {/* Decorative Image/Box */}
               <div className="relative h-[500px] w-full bg-stone-200 rounded-lg overflow-hidden hidden lg:block">
                  <div className="absolute inset-0 bg-neutral-900/10" />
-                 {/* This would ideally be another image */}
                  <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center p-8 border border-white/20 bg-white/10 backdrop-blur-md rounded-xl max-w-xs">
                         <h4 className="text-3xl font-serif text-white mb-2">Private Dining</h4>
@@ -75,17 +73,17 @@ export default function Home() {
             <div className="grid md:grid-cols-4 gap-8 mb-8">
               <div className="col-span-1 md:col-span-2">
                 <h3 className="text-2xl font-serif text-white mb-4">Savor & Vine</h3>
-                <p className="max-w-sm">
+                <p className="max-w-sm text-neutral-400">
                   Elevating the dining experience through sustainable sourcing, culinary innovation, and impeccable service.
                 </p>
               </div>
               <div>
                 <h4 className="text-white font-bold mb-4">Links</h4>
                 <ul className="space-y-2">
-                  <li><a href="#" className="hover:text-primary transition-colors">Home</a></li>
-                  <li><a href="#" className="hover:text-primary transition-colors">Menu</a></li>
-                  <li><a href="#" className="hover:text-primary transition-colors">About Us</a></li>
-                  <li><a href="#" className="hover:text-primary transition-colors">Reservations</a></li>
+                  <li><Link href="/"><a className="hover:text-primary transition-colors">Home</a></Link></li>
+                  <li><Link href="/#menu"><a className="hover:text-primary transition-colors">Menu</a></Link></li>
+                  <li><Link href="/story"><a className="hover:text-primary transition-colors">Story</a></Link></li>
+                  <li><Link href="/reservations"><a className="hover:text-primary transition-colors">Reservations</a></Link></li>
                 </ul>
               </div>
               <div>
