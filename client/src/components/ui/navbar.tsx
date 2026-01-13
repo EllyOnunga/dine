@@ -38,7 +38,7 @@ export function Navbar() {
     >
       <div className="container mx-auto px-4 flex items-center justify-between">
         <Link href="/">
-          <a className="flex items-center gap-2 group">
+          <div className="flex items-center gap-2 group cursor-pointer">
             <div className="bg-primary text-primary-foreground p-2 rounded-full transition-transform group-hover:rotate-12">
               <UtensilsCrossed className="h-5 w-5" />
             </div>
@@ -46,19 +46,19 @@ export function Navbar() {
               navBackground ? "text-foreground" : "text-white")}>
               Savor & Vine
             </span>
-          </a>
+          </div>
         </Link>
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
           {navLinks.map((item) => (
             <Link key={item.name} href={item.href}>
-              <a className={cn(
-                "text-sm font-medium hover:text-primary transition-colors",
+              <span className={cn(
+                "text-sm font-medium hover:text-primary transition-colors cursor-pointer",
                 navBackground ? "text-foreground/80" : "text-white/90 hover:text-white"
               )}>
                 {item.name}
-              </a>
+              </span>
             </Link>
           ))}
           <Link href="/reservations">
@@ -89,12 +89,12 @@ export function Navbar() {
         <div className="md:hidden absolute top-full left-0 w-full bg-background border-b border-border p-4 flex flex-col gap-4 shadow-xl animate-in slide-in-from-top duration-300">
           {navLinks.map((item) => (
             <Link key={item.name} href={item.href}>
-              <a 
+              <span 
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-lg font-serif font-semibold border-b border-border/50 pb-2"
+                className="text-lg font-serif font-semibold border-b border-border/50 pb-2 cursor-pointer"
               >
                 {item.name}
-              </a>
+              </span>
             </Link>
           ))}
           <Link href="/reservations">

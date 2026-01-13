@@ -1,7 +1,6 @@
 import { Hero } from "@/components/ui/hero";
 import { MenuSection } from "@/components/ui/menu-section";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Clock, MapPin, Phone } from "lucide-react";
 import { Link } from "wouter";
@@ -80,10 +79,10 @@ export default function Home() {
               <div>
                 <h4 className="text-white font-bold mb-4">Links</h4>
                 <ul className="space-y-2">
-                  <li><Link href="/"><a className="hover:text-primary transition-colors">Home</a></Link></li>
-                  <li><Link href="/#menu"><a className="hover:text-primary transition-colors">Menu</a></Link></li>
-                  <li><Link href="/story"><a className="hover:text-primary transition-colors">Story</a></Link></li>
-                  <li><Link href="/reservations"><a className="hover:text-primary transition-colors">Reservations</a></Link></li>
+                  <li><Link href="/"><span className="hover:text-primary transition-colors cursor-pointer">Home</span></Link></li>
+                  <li><Link href="/#menu"><span className="hover:text-primary transition-colors cursor-pointer">Menu</span></Link></li>
+                  <li><Link href="/story"><span className="hover:text-primary transition-colors cursor-pointer">Story</span></Link></li>
+                  <li><Link href="/reservations"><span className="hover:text-primary transition-colors cursor-pointer">Reservations</span></Link></li>
                 </ul>
               </div>
               <div>
