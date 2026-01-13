@@ -2,29 +2,30 @@ import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-// Import generated images
-import burrataImg from "@assets/generated_images/gourmet_burrata_and_figs_salad_shot_professionally.png";
-import wagyuImg from "@assets/generated_images/wagyu_beef_carpaccio_with_truffle_oil_shot_professionally.png";
-import scallopsImg from "@assets/generated_images/seared_scallops_with_cauliflower_puree_shot_professionally.png";
-import risottoImg from "@assets/generated_images/truffle_mushroom_risotto_with_parmesan_crisp_shot_professionally.png";
-import duckImg from "@assets/generated_images/pan-roasted_duck_breast_with_cherry_reduction_shot_professionally.png";
-import lambImg from "@assets/generated_images/herb-crusted_lamb_rack_with_red_wine_jus_shot_professionally.png";
+// Import Kenyan generated images
+import nyamaChomaImg from "@assets/generated_images/nyama_choma_platter_with_kachumbari_and_ugali_shot_professionally.png";
+import fishCurryImg from "@assets/generated_images/swahili_fish_curry_with_coconut_rice_shot_professionally.png";
+import samosaImg from "@assets/generated_images/samosas_and_mahamri_on_a_platter_shot_professionally.png";
+import tilapiaImg from "@assets/generated_images/grilled_tilapia_with_plantains_shot_professionally.png";
+import biryaniImg from "@assets/generated_images/chicken_biryani_kenyan_style_shot_professionally.png";
+import beefStewImg from "@assets/generated_images/beef_stew_with_chapati_shot_professionally.png";
 
 const menuItems = [
   {
-    category: "Starters",
+    category: "Bitings & Starters",
     items: [
-      { name: "Burrata & Figs", price: "$18", description: "Fresh burrata, caramelized figs, toasted hazelnuts, balsamic glaze", tag: "Vegetarian", image: burrataImg },
-      { name: "Wagyu Carpaccio", price: "$24", description: "Thinly sliced wagyu beef, truffle oil, parmesan shavings, arugula", tag: "Signature", image: wagyuImg },
-      { name: "Seared Scallops", price: "$22", description: "Pan-seared scallops, cauliflower purée, crispy pancetta, lemon butter", image: scallopsImg },
+      { name: "Maasai Beef Samosas", price: "KSh 450", description: "Three crispy samosas filled with spiced minced beef and local herbs", tag: "Must Try", image: samosaImg },
+      { name: "Swahili Mahamri", price: "KSh 350", description: "Golden-brown coconut donuts, perfect with your morning tea or stew", tag: "Coastal", image: samosaImg },
+      { name: "Lake Victoria Tilapia Bites", price: "KSh 850", description: "Crispy fried tilapia nuggets served with a tangy lime dip", image: tilapiaImg },
     ]
   },
   {
-    category: "Mains",
+    category: "Main Plates",
     items: [
-      { name: "Truffle Mushroom Risotto", price: "$28", description: "Arborio rice, wild mushrooms, black truffle, parmesan crisp", tag: "Popular", image: risottoImg },
-      { name: "Pan-Roasted Duck Breast", price: "$34", description: "Duck breast, cherry reduction, fondant potatoes, roasted asparagus", image: duckImg },
-      { name: "Herb-Crusted Lamb Rack", price: "$42", description: "New Zealand lamb, pistachio crust, red wine jus, root vegetables", image: lambImg },
+      { name: "Grand Nyama Choma Platter", price: "KSh 1,800", description: "Prime goat meat flame-grilled to perfection, served with Ugali and Kachumbari", tag: "Signature", image: nyamaChomaImg },
+      { name: "Coastal Samaki wa Kupaka", price: "KSh 1,450", description: "Grilled fish in a rich, creamy coconut and tamarind sauce", tag: "Swahili", image: fishCurryImg },
+      { name: "Mombasa Chicken Biryani", price: "KSh 1,200", description: "Fragrant rice layered with tender spiced chicken, served with raita", image: biryaniImg },
+      { name: "Heritage Beef Stew", price: "KSh 950", description: "Slow-cooked beef chunks with garden vegetables, served with layered Chapati", image: beefStewImg },
     ]
   }
 ];
@@ -40,7 +41,7 @@ export function MenuSection() {
             viewport={{ once: true }}
             className="text-primary font-medium tracking-widest uppercase text-sm mb-2 block"
           >
-            Discover Our Flavors
+            A Taste of Kenya
           </motion.span>
           <motion.h2 
             initial={{ opacity: 0, y: 10 }}
@@ -49,7 +50,7 @@ export function MenuSection() {
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-5xl font-serif font-bold text-foreground"
           >
-            The Menu
+            Our Menu
           </motion.h2>
           <motion.div 
             initial={{ width: 0 }}
@@ -112,15 +113,6 @@ export function MenuSection() {
                         <p className="text-muted-foreground text-sm leading-relaxed line-clamp-2 italic">
                           {item.description}
                         </p>
-                        <div className="mt-6 pt-4 border-t border-border/50 flex justify-between items-center">
-                          <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Chef's Special</span>
-                          <motion.div 
-                            whileHover={{ x: 5 }}
-                            className="text-primary cursor-pointer"
-                          >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                          </motion.div>
-                        </div>
                       </CardContent>
                     </Card>
                   </motion.div>

@@ -25,7 +25,7 @@ export default function Home() {
                   </span>
                   <h2 className="text-4xl font-serif font-bold mb-6">Book Your Table</h2>
                   <p className="text-muted-foreground text-lg leading-relaxed mb-6">
-                    Join us for an unforgettable dining experience. Whether it's a romantic dinner for two or a celebration with friends, we look forward to serving you.
+                    Experience authentic Kenyan hospitality in a modern setting. Join us at Karen Triangle for an unforgettable culinary journey.
                   </p>
                 </div>
 
@@ -33,14 +33,14 @@ export default function Home() {
                   <div className="bg-background p-6 rounded-lg shadow-sm border border-border/50">
                     <Clock className="w-6 h-6 text-primary mb-4" />
                     <h3 className="font-serif font-bold mb-2">Opening Hours</h3>
-                    <p className="text-sm text-muted-foreground">Mon-Sun: 5pm - 11pm</p>
-                    <p className="text-sm text-muted-foreground">Happy Hour: 5pm - 7pm</p>
+                    <p className="text-sm text-muted-foreground">Mon-Sun: 11am - 11pm</p>
+                    <p className="text-sm text-muted-foreground">Dinner: 6pm - 11pm</p>
                   </div>
                   <div className="bg-background p-6 rounded-lg shadow-sm border border-border/50">
                     <MapPin className="w-6 h-6 text-primary mb-4" />
                     <h3 className="font-serif font-bold mb-2">Location</h3>
-                    <p className="text-sm text-muted-foreground">123 Culinary Avenue</p>
-                    <p className="text-sm text-muted-foreground">New York, NY 10012</p>
+                    <p className="text-sm text-muted-foreground">Karen Triangle Mall</p>
+                    <p className="text-sm text-muted-foreground">Karen, Nairobi</p>
                   </div>
                 </div>
 
@@ -53,11 +53,11 @@ export default function Home() {
 
               {/* Decorative Image/Box */}
               <div className="relative h-[500px] w-full bg-stone-200 rounded-lg overflow-hidden hidden lg:block">
-                 <div className="absolute inset-0 bg-neutral-900/10" />
+                 <div className="absolute inset-0 bg-black/20" />
                  <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center p-8 border border-white/20 bg-white/10 backdrop-blur-md rounded-xl max-w-xs">
-                        <h4 className="text-3xl font-serif text-white mb-2">Private Dining</h4>
-                        <p className="text-white/80 mb-6">Host your special events with us in our exclusive private room.</p>
+                        <h4 className="text-3xl font-serif text-white mb-2">Events & Gatherings</h4>
+                        <p className="text-white/80 mb-6">Host your koroga or corporate dinner in our exclusive Nairobi lounge.</p>
                         <Button variant="outline" className="text-white border-white hover:bg-white hover:text-black">Enquire Now</Button>
                     </div>
                  </div>
@@ -73,7 +73,7 @@ export default function Home() {
               <div className="col-span-1 md:col-span-2">
                 <h3 className="text-2xl font-serif text-white mb-4">Savor & Vine</h3>
                 <p className="max-w-sm text-neutral-400">
-                  Elevating the dining experience through sustainable sourcing, culinary innovation, and impeccable service.
+                  Bringing the spirit of Kenya to your plate with modern flair. Authentic, sustainable, and unforgettable.
                 </p>
               </div>
               <div>
@@ -88,15 +88,15 @@ export default function Home() {
               <div>
                 <h4 className="text-white font-bold mb-4">Contact</h4>
                 <ul className="space-y-2">
-                  <li className="flex items-center gap-2"><Phone className="w-4 h-4"/> (555) 123-4567</li>
-                  <li className="flex items-center gap-2"><MapPin className="w-4 h-4"/> 123 Culinary Ave, NY</li>
-                  <li>info@savorandvine.com</li>
+                  <li className="flex items-center gap-2"><Phone className="w-4 h-4"/> +254 712 345 678</li>
+                  <li className="flex items-center gap-2"><MapPin className="w-4 h-4"/> Karen, Nairobi</li>
+                  <li>info@savorandvine.co.ke</li>
                 </ul>
               </div>
             </div>
             <Separator className="bg-neutral-800 my-8" />
             <div className="text-center text-sm">
-              © 2024 Savor & Vine. All rights reserved.
+              © 2024 Savor & Vine Kenya. All rights reserved.
             </div>
           </div>
         </footer>
