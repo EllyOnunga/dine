@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { UtensilsCrossed, Menu as MenuIcon, X } from "lucide-react";
+import { UtensilsCrossed, Menu as MenuIcon, X, Settings as SettingsIcon } from "lucide-react";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -61,27 +61,42 @@ export function Navbar() {
               </span>
             </Link>
           ))}
-          <Link href="/reservations">
-            <Button 
-              variant={navBackground ? "default" : "secondary"} 
-              className="font-serif italic"
-            >
-              Book a Table
-            </Button>
-          </Link>
+          
+          <div className="flex items-center gap-4 border-l border-border/50 pl-8">
+            <Link href="/settings">
+              <Button variant="ghost" size="icon" className={cn("rounded-full", navBackground ? "text-foreground/80" : "text-white/80 hover:text-white")}>
+                <SettingsIcon className="h-5 w-5" />
+              </Button>
+            </Link>
+            <Link href="/reservations">
+              <Button 
+                variant={navBackground ? "default" : "secondary"} 
+                className="font-serif italic"
+              >
+                Book a Table
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Mobile Toggle */}
-        <button 
-          className="md:hidden p-2"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        >
-          {mobileMenuOpen ? (
-            <X className={cn("h-6 w-6", navBackground ? "text-foreground" : "text-white")} />
-          ) : (
-            <MenuIcon className={cn("h-6 w-6", navBackground ? "text-foreground" : "text-white")} />
-          )}
-        </button>
+        <div className="md:hidden flex items-center gap-2">
+           <Link href="/settings">
+              <Button variant="ghost" size="icon" className={cn("rounded-full", navBackground ? "text-foreground/80" : "text-white/80")}>
+                <SettingsIcon className="h-5 w-5" />
+              </Button>
+            </Link>
+          <button 
+            className="p-2"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? (
+              <X className={cn("h-6 w-6", navBackground ? "text-foreground" : "text-white")} />
+            ) : (
+              <MenuIcon className={cn("h-6 w-6", navBackground ? "text-foreground" : "text-white")} />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu */}
