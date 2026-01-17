@@ -3,6 +3,7 @@ import { type Server } from "http";
 import { storage } from "./storage";
 import { insertReservationSchema, insertNewsletterSchema, insertBlogSchema, insertEnquirySchema, insertMenuItemSchema } from "@shared/schema";
 import { ZodError } from "zod";
+import { sendReservationConfirmation, sendReservationNotificationToAdmin, sendEnquiryNotification, sendNewsletterWelcome } from "./email";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -60,6 +61,15 @@ export async function registerRoutes(
     try {
       const data = insertReservationSchema.parse(req.body);
       const reservation = await storage.createReservation(data);
+
+      // Send confirmation emails (don't await to avoid blocking the response)
+      sendReservationConfirmation(data).catch(err =>
+        console.error('Failed to send reservation confirmation:', err)
+      );
+      sendReservationNotificationToAdmin(data).catch(err =>
+        console.error('Failed to send admin notification:', err)
+      );
+
       res.status(201).json(reservation);
     } catch (err) {
       if (err instanceof ZodError) {
@@ -74,6 +84,12 @@ export async function registerRoutes(
     try {
       const { email } = insertNewsletterSchema.parse(req.body);
       const lead = await storage.addNewsletterLead(email);
+
+      // Send welcome email (don't await to avoid blocking)
+      sendNewsletterWelcome(email).catch(err =>
+        console.error('Failed to send newsletter welcome:', err)
+      );
+
       res.status(201).json(lead);
     } catch (err) {
       if (err instanceof ZodError) {
@@ -88,6 +104,12 @@ export async function registerRoutes(
     try {
       const data = insertEnquirySchema.parse(req.body);
       const enquiry = await storage.createEnquiry(data);
+
+      // Send notification to admin (don't await to avoid blocking)
+      sendEnquiryNotification(data).catch(err =>
+        console.error('Failed to send enquiry notification:', err)
+      );
+
       res.status(201).json(enquiry);
     } catch (err) {
       if (err instanceof ZodError) {

@@ -31,13 +31,17 @@ RUN npm install --omit=dev
 # Copy built assets
 COPY --from=builder /app/dist ./dist
 
+# Copy migrations and migration script
+COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/script ./script
+
 ENV NODE_ENV=production
 ENV PORT=3000
 
 EXPOSE 3000
 
-# Create a startup script to run db:push before starting the server
-RUN echo '#!/bin/sh\nnpm run db:push\nnpm start' > /app/entrypoint.sh
+# Create a startup script to run migrations before starting the server
+RUN echo '#!/bin/sh\nnpm run db:migrate\nnpm start' > /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 CMD ["/app/entrypoint.sh"]
