@@ -9,12 +9,16 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   // Health check endpoint
-  app.get("/health", (_req, res) => {
-    res.status(200).json({
-      status: "ok",
+  app.get("/health", async (_req, res) => {
+    const isStorageHealthy = await storage.healthCheck();
+    const status = isStorageHealthy ? "ok" : "error";
+
+    res.status(isStorageHealthy ? 200 : 503).json({
+      status,
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || "development",
+      database: isStorageHealthy ? "connected" : "disconnected",
     });
   });
 

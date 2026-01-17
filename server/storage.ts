@@ -3,7 +3,6 @@ import { users, menuItems, reservations, newsletterLeads, blogs, enquiries } fro
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { PartialMenuItem } from "@shared/schema"; // Actually Partial is fine
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -38,6 +37,7 @@ export interface IStorage {
   createEnquiry(enquiry: InsertEnquiry): Promise<Enquiry>;
   getEnquiries(): Promise<Enquiry[]>;
   deleteEnquiry(id: string): Promise<void>;
+  healthCheck(): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -147,6 +147,14 @@ export class DatabaseStorage implements IStorage {
   async deleteEnquiry(id: string): Promise<void> {
     await db.delete(enquiries).where(eq(enquiries.id, id));
   }
+  async healthCheck(): Promise<boolean> {
+    try {
+      await db.execute(require("drizzle-orm").sql`SELECT 1`);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 }
 
 export class MemStorage implements IStorage {
@@ -211,6 +219,68 @@ export class MemStorage implements IStorage {
     };
     this.newsletterLeads.set(email, lead);
     return lead;
+  }
+
+  async getNewsletterLeads(): Promise<NewsletterLead[]> {
+    return Array.from(this.newsletterLeads.values());
+  }
+
+  async getMenuItem(id: string): Promise<MenuItem | undefined> {
+    return this.menuItems.find(item => item.id === id);
+  }
+
+  async createMenuItem(item: any): Promise<MenuItem> {
+    const newItem = { ...item, id: randomUUID() };
+    this.menuItems.push(newItem);
+    return newItem;
+  }
+
+  async updateMenuItem(id: string, item: any): Promise<MenuItem> {
+    const index = this.menuItems.findIndex(i => i.id === id);
+    if (index === -1) throw new Error("Item not found");
+    this.menuItems[index] = { ...this.menuItems[index], ...item };
+    return this.menuItems[index];
+  }
+
+  async deleteMenuItem(id: string): Promise<void> {
+    this.menuItems = this.menuItems.filter(i => i.id !== id);
+  }
+
+  async getBlogs(): Promise<Blog[]> {
+    return [];
+  }
+
+  async getBlog(id: string): Promise<Blog | undefined> {
+    return undefined;
+  }
+
+  async createBlog(blog: InsertBlog): Promise<Blog> {
+    throw new Error("Not implemented");
+  }
+
+  async updateBlog(id: string, blog: Partial<Blog>): Promise<Blog> {
+    throw new Error("Not implemented");
+  }
+
+  async deleteBlog(id: string): Promise<void> { }
+
+  async createEnquiry(enquiry: InsertEnquiry): Promise<Enquiry> {
+    const id = randomUUID();
+    return { ...enquiry, id, createdAt: new Date() };
+  }
+
+  async getEnquiries(): Promise<Enquiry[]> {
+    return [];
+  }
+
+  async deleteEnquiry(id: string): Promise<void> { }
+
+  async deleteReservation(id: string): Promise<void> {
+    this.reservations = this.reservations.filter(r => r.id !== id);
+  }
+
+  async healthCheck(): Promise<boolean> {
+    return true;
   }
 }
 
