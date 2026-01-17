@@ -169,12 +169,22 @@ git push heroku main
 3. Set environment variables
 4. Deploy automatically on push
 
-#### DigitalOcean App Platform
+#### Docker
 
-1. Create new app from GitHub
-2. Add managed PostgreSQL database
-3. Configure environment variables
-4. Deploy
+1. **Build and run with Docker Compose**
+
+   ```bash
+   docker-compose up --build
+   ```
+
+   This will start both the application and a PostgreSQL database. The application will be available at `http://localhost:3000`.
+
+2. **Run only the application (assuming external DB)**
+
+   ```bash
+   docker build -t dine-app .
+   docker run -p 3000:3000 -e DATABASE_URL=your-db-url dine-app
+   ```
 
 ## ⚠️ Important Notes
 

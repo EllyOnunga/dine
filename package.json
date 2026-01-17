@@ -80,7 +80,9 @@
     "wouter": "^3.9.0",
     "ws": "^8.19.0",
     "zod": "^4.3.5",
-    "zod-validation-error": "^5.0.0"
+    "zod-validation-error": "^5.0.0",
+    "drizzle-kit": "^0.31.8",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
@@ -97,11 +99,9 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.23",
-    "drizzle-kit": "^0.31.8",
     "esbuild": "^0.27.2",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
-    "tsx": "^4.21.0",
     "typescript": "5.9.3",
     "vite": "^7.3.1"
   },
