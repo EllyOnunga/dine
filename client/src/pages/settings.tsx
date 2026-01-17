@@ -14,8 +14,9 @@ export default function Settings() {
     <div className="pt-24 min-h-screen bg-background">
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
           className="space-y-8"
         >
           <div>
@@ -26,7 +27,7 @@ export default function Settings() {
           <Card className="border-border shadow-sm overflow-hidden">
             <CardHeader className="bg-muted/30">
               <CardTitle className="font-serif">Appearance</CardTitle>
-              <CardDescription>Customize how Savor & Vine looks on your device.</CardDescription>
+              <CardDescription>Customize how Savannah & Spice looks on your device.</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
               <div className="space-y-6">

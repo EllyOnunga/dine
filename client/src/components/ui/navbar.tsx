@@ -21,7 +21,8 @@ export function Navbar() {
   const navBackground = scrolled || !isHome;
 
   const navLinks = [
-    { name: "Menu", href: isHome ? "#menu" : "/#menu" },
+    { name: "Menu", href: "/menu" },
+    { name: "Blog", href: "/blog" },
     { name: "Story", href: "/story" },
     { name: "Reservations", href: "/reservations" },
     { name: "Contact", href: "/contact" },
@@ -42,9 +43,9 @@ export function Navbar() {
             <div className="bg-primary text-primary-foreground p-2 rounded-full transition-transform group-hover:rotate-12">
               <UtensilsCrossed className="h-5 w-5" />
             </div>
-            <span className={cn("text-xl font-serif font-bold tracking-tight transition-colors", 
+            <span className={cn("text-xl font-serif font-bold tracking-tight transition-colors",
               navBackground ? "text-foreground" : "text-white")}>
-              Savor & Vine
+              Savannah & Spice
             </span>
           </div>
         </Link>
@@ -61,7 +62,7 @@ export function Navbar() {
               </span>
             </Link>
           ))}
-          
+
           <div className="flex items-center gap-4 border-l border-border/50 pl-8">
             <Link href="/settings">
               <Button variant="ghost" size="icon" className={cn("rounded-full", navBackground ? "text-foreground/80" : "text-white/80 hover:text-white")}>
@@ -69,8 +70,8 @@ export function Navbar() {
               </Button>
             </Link>
             <Link href="/reservations">
-              <Button 
-                variant={navBackground ? "default" : "secondary"} 
+              <Button
+                variant={navBackground ? "default" : "secondary"}
                 className="font-serif italic"
               >
                 Book a Table
@@ -81,12 +82,12 @@ export function Navbar() {
 
         {/* Mobile Toggle */}
         <div className="md:hidden flex items-center gap-2">
-           <Link href="/settings">
-              <Button variant="ghost" size="icon" className={cn("rounded-full", navBackground ? "text-foreground/80" : "text-white/80")}>
-                <SettingsIcon className="h-5 w-5" />
-              </Button>
-            </Link>
-          <button 
+          <Link href="/settings">
+            <Button variant="ghost" size="icon" className={cn("rounded-full", navBackground ? "text-foreground/80" : "text-white/80")}>
+              <SettingsIcon className="h-5 w-5" />
+            </Button>
+          </Link>
+          <button
             className="p-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
@@ -104,7 +105,7 @@ export function Navbar() {
         <div className="md:hidden absolute top-full left-0 w-full bg-background border-b border-border p-4 flex flex-col gap-4 shadow-xl animate-in slide-in-from-top duration-300">
           {navLinks.map((item) => (
             <Link key={item.name} href={item.href}>
-              <span 
+              <span
                 onClick={() => setMobileMenuOpen(false)}
                 className="text-lg font-serif font-semibold border-b border-border/50 pb-2 cursor-pointer"
               >

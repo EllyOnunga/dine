@@ -1,7 +1,9 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { setupMiddleware } from "./middleware";
 
 const app = express();
 const httpServer = createServer(app);
@@ -11,6 +13,9 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+// Security and performance middleware (before body parsing)
+setupMiddleware(app);
 
 app.use(
   express.json({
@@ -62,12 +67,31 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
+  // Error handling middleware (must be after all routes)
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    // Log error details (in production, use proper logging service)
+    if (process.env.NODE_ENV === "production") {
+      console.error({
+        timestamp: new Date().toISOString(),
+        status,
+        message,
+        path: _req.path,
+        method: _req.method,
+      });
+    } else {
+      console.error(err);
+    }
+
+    // Don't expose stack traces in production
+    const response: any = { message };
+    if (process.env.NODE_ENV !== "production") {
+      response.stack = err.stack;
+    }
+
+    res.status(status).json(response);
   });
 
   // importantly only setup vite in development and after
@@ -84,7 +108,7 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
+  const port = parseInt(process.env.PORT || "3000", 10);
   httpServer.listen(
     {
       port,
@@ -95,4 +119,23 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
     },
   );
+
+  // Graceful shutdown
+  const shutdown = async (signal: string) => {
+    log(`${signal} received, shutting down gracefully...`);
+
+    httpServer.close(() => {
+      log("HTTP server closed");
+      process.exit(0);
+    });
+
+    // Force shutdown after 10 seconds
+    setTimeout(() => {
+      log("Forcing shutdown after timeout");
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 })();
