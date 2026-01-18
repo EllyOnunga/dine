@@ -22,6 +22,13 @@ import { Navbar } from "./components/ui/navbar";
 import { Footer } from "./components/ui/footer";
 import { ScrollToTop } from "./components/ui/scroll-to-top";
 import { WhatsAppButton } from "./components/ui/whatsapp-button";
+import { AuthProvider } from "@/hooks/use-auth";
+import { ProtectedRoute } from "@/lib/protected-route";
+import { CartProvider } from "@/hooks/cart-context";
+import AuthPage from "./pages/auth";
+import CartPage from "./pages/cart";
+import TrackOrderPage from "./pages/track-order";
+import SuitesPage from "./pages/suites";
 
 function Router() {
   return (
@@ -29,12 +36,16 @@ function Router() {
       <ScrollToTop />
       <Navbar />
       <Switch>
+        <ProtectedRoute path="/admin" component={AdminDashboard} />
+        <Route path="/auth" component={AuthPage} />
+        <Route path="/cart" component={CartPage} />
+        <Route path="/track-order" component={TrackOrderPage} />
         <Route path="/" component={Home} />
         <Route path="/menu" component={Menu} />
+        <Route path="/stay" component={SuitesPage} />
         <Route path="/blog" component={Blog} />
         <Route path="/blog/:id" component={BlogDetail} />
         <Route path="/payments" component={PaymentMethods} />
-        <Route path="/admin" component={AdminDashboard} />
         <Route path="/story" component={Story} />
         <Route path="/reservations" component={Reservations} />
         <Route path="/contact" component={Contact} />
@@ -54,10 +65,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="savor-theme">
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <AuthProvider>
+          <CartProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </CartProvider>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

@@ -48,7 +48,7 @@ echo "✅ Self-signed certificate created"
 echo ""
 
 echo "📋 Step 2: Starting Nginx with self-signed certificate..."
-docker-compose -f docker-compose.prod.yml up -d nginx
+docker compose -f docker-compose.prod.yml up -d nginx
 
 echo "✅ Nginx started"
 echo ""
@@ -58,7 +58,7 @@ echo "This may take a minute..."
 echo ""
 
 # Obtain the real certificate
-docker-compose -f docker-compose.prod.yml run --rm certbot certonly \
+docker compose -f docker-compose.prod.yml run --rm certbot certonly \
     --webroot \
     --webroot-path=/var/www/certbot \
     --email $EMAIL \
@@ -82,7 +82,7 @@ if [ $? -eq 0 ]; then
     echo ""
     
     echo "📋 Step 5: Restarting Nginx with real certificate..."
-    docker-compose -f docker-compose.prod.yml restart nginx
+    docker compose -f docker-compose.prod.yml restart nginx
     
     echo "✅ Nginx restarted"
     echo ""
@@ -95,7 +95,7 @@ if [ $? -eq 0 ]; then
     echo "Certificate will auto-renew every 12 hours via the certbot container."
     echo ""
     echo "To check certificate status:"
-    echo "  docker-compose -f docker-compose.prod.yml logs certbot"
+    echo "  docker compose -f docker-compose.prod.yml logs certbot"
 else
     echo "❌ Failed to obtain certificate"
     echo ""

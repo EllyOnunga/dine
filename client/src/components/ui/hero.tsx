@@ -40,6 +40,11 @@ export function Hero() {
                 Reserve Your Table
               </Button>
             </Link>
+            <Link href="/stay">
+              <Button size="lg" variant="ghost" className="text-accent hover:text-white hover:bg-white/10 min-w-[200px] h-14 text-lg backdrop-blur-sm transition-all duration-500 cursor-pointer border border-accent/30">
+                Book a Stay
+              </Button>
+            </Link>
           </div>
         </motion.div>
       </div>

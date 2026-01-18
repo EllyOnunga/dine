@@ -4,10 +4,13 @@ import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { useCart } from "@/hooks/cart-context";
 import { Link } from "wouter";
 import { ChevronRight, Utensils } from "lucide-react";
 
 export default function MenuPage() {
+    const { addToCart } = useCart();
     const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
         queryKey: ["/api/menu"],
     });
@@ -105,6 +108,15 @@ export default function MenuPage() {
                                                                     {item.tag}
                                                                 </Badge>
                                                             )}
+                                                            <div className="pt-2">
+                                                                <Button
+                                                                    size="sm"
+                                                                    className="w-full sm:w-auto gap-2"
+                                                                    onClick={() => addToCart(item)}
+                                                                >
+                                                                    <Utensils className="h-4 w-4" /> Add to Cart
+                                                                </Button>
+                                                            </div>
                                                         </div>
                                                     </CardContent>
                                                 </Card>

@@ -1,4 +1,4 @@
-CREATE TABLE "blogs" (
+CREATE TABLE IF NOT EXISTS "blogs" (
 	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"title" text NOT NULL,
 	"content" text NOT NULL,
@@ -8,7 +8,7 @@ CREATE TABLE "blogs" (
 	"created_at" timestamp DEFAULT now()
 );
 --> statement-breakpoint
-CREATE TABLE "enquiries" (
+CREATE TABLE IF NOT EXISTS "enquiries" (
 	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
 	"email" text NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE "enquiries" (
 	"created_at" timestamp DEFAULT now()
 );
 --> statement-breakpoint
-CREATE TABLE "menu_items" (
+CREATE TABLE IF NOT EXISTS "menu_items" (
 	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
 	"price" text NOT NULL,
@@ -28,14 +28,14 @@ CREATE TABLE "menu_items" (
 	"image" text NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "newsletter_leads" (
+CREATE TABLE IF NOT EXISTS "newsletter_leads" (
 	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"email" text NOT NULL,
 	"created_at" timestamp DEFAULT now(),
 	CONSTRAINT "newsletter_leads_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
-CREATE TABLE "reservations" (
+CREATE TABLE IF NOT EXISTS "reservations" (
 	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
 	"email" text NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE "reservations" (
 	"created_at" timestamp DEFAULT now()
 );
 --> statement-breakpoint
-CREATE TABLE "users" (
+CREATE TABLE IF NOT EXISTS "users" (
 	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"username" text NOT NULL,
 	"password" text NOT NULL,

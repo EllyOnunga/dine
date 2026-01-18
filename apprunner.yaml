@@ -1,0 +1,13 @@
+version: 1.0
+runtime: nodejs18
+build:
+  commands:
+    - npm install
+    - npm run build
+run:
+  command: /app/entrypoint.sh
+  network:
+    port: 3000
+env:
+  - name: NODE_ENV
+    value: production

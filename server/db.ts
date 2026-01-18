@@ -1,8 +1,17 @@
-import { Pool } from 'pg';
+import { Pool, PoolConfig } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
 
-// Use a dummy connection string if not set, to allow the app to start
-// in MemStorage mode. The pool will only error if a query is actually executed.
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL || "postgres://localhost:5432/postgres" });
+const poolConfig: PoolConfig = {
+    connectionString: process.env.DATABASE_URL || "postgres://localhost:5432/postgres",
+};
+
+// Enable SSL for RDS and other managed databases in production
+if (process.env.NODE_ENV === 'production') {
+    poolConfig.ssl = {
+        rejectUnauthorized: false
+    };
+}
+
+export const pool = new Pool(poolConfig);
 export const db = drizzle(pool, { schema });

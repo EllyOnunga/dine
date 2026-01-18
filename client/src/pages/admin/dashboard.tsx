@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MenuItem, Reservation, Enquiry, Blog, NewsletterLead } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { MenuItem, Reservation, Enquiry, Blog, NewsletterLead, Order, OrderItem, SiteSetting } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,8 @@ import {
     Mail,
     CheckCircle2,
     XCircle,
-    Image as ImageIcon
+    Image as ImageIcon,
+    ShoppingBag
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -32,8 +34,25 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+
+// Analytics type definition
+interface Analytics {
+    totalRevenue: number;
+    totalOrders: number;
+    totalReservations: number;
+    ordersByStatus: Record<string, number>;
+    topItems: Array<{ name: string; count: number }>;
+}
 
 export default function AdminDashboard() {
+    const { logoutMutation } = useAuth();
     const { toast } = useToast();
     const [activeTab, setActiveTab] = useState("reservations");
 
@@ -43,12 +62,17 @@ export default function AdminDashboard() {
     const { data: menuItems, isLoading: loadingMenu } = useQuery<MenuItem[]>({ queryKey: ["/api/menu"] });
     const { data: blogs, isLoading: loadingBlogs } = useQuery<Blog[]>({ queryKey: ["/api/blogs"] });
     const { data: newsletter, isLoading: loadingNewsletter } = useQuery<NewsletterLead[]>({ queryKey: ["/api/admin/newsletter"] });
+    const { data: orders, isLoading: loadingOrders } = useQuery<(Order & { items: OrderItem[] })[]>({ queryKey: ["/api/admin/orders"] });
+    const { data: analytics } = useQuery<Analytics>({ queryKey: ["/api/admin/analytics"] });
+    const { data: settings } = useQuery<SiteSetting>({ queryKey: ["/api/admin/settings"] });
 
     // State for Dialogs
     const [isMenuDialogOpen, setIsMenuDialogOpen] = useState(false);
     const [isBlogDialogOpen, setIsBlogDialogOpen] = useState(false);
     const [editingMenuItem, setEditingMenuItem] = useState<Partial<MenuItem> | null>(null);
     const [editingBlog, setEditingBlog] = useState<Partial<Blog> | null>(null);
+    const [sendMessageOrderId, setSendMessageOrderId] = useState<string | null>(null);
+    const [customMessage, setCustomMessage] = useState("");
 
     const [menuForm, setMenuForm] = useState({
         name: "", price: "", originalPrice: "", description: "", category: "", tag: "", image: ""
@@ -120,6 +144,33 @@ export default function AdminDashboard() {
         }
     });
 
+    const updateOrderStatus = useMutation({
+        mutationFn: async ({ id, status }: { id: string, status: string }) => {
+            return apiRequest("PATCH", `/api/admin/orders/${id}`, { status });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+            toast({ title: "Order status updated and notification sent" });
+        },
+        onError: (err: Error) => {
+            toast({ title: "Failed to update order status", description: err.message, variant: "destructive" });
+        }
+    });
+
+    const sendOrderMessage = useMutation({
+        mutationFn: async ({ id, message }: { id: string, message: string }) => {
+            return apiRequest("POST", `/api/admin/orders/${id}/message`, { message });
+        },
+        onSuccess: () => {
+            toast({ title: "Custom message sent successfully" });
+            setSendMessageOrderId(null);
+            setCustomMessage("");
+        },
+        onError: (err: Error) => {
+            toast({ title: "Failed to send message", description: err.message, variant: "destructive" });
+        }
+    });
+
     const openMenuDialog = (item: MenuItem | null = null) => {
         if (item) {
             setEditingMenuItem(item);
@@ -156,7 +207,7 @@ export default function AdminDashboard() {
         setIsBlogDialogOpen(true);
     };
 
-    if (loadingReservations || loadingEnquiries || loadingMenu || loadingBlogs || loadingNewsletter) {
+    if (loadingReservations || loadingEnquiries || loadingMenu || loadingBlogs || loadingNewsletter || loadingOrders) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -173,17 +224,27 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex gap-4">
                     <Button variant="outline" onClick={() => window.location.href = "/"}>View Site</Button>
-                    <Button className="bg-primary hover:bg-primary/90">Sign Out</Button>
+                    <Button
+                        className="bg-primary hover:bg-primary/90"
+                        onClick={() => logoutMutation.mutate()}
+                        disabled={logoutMutation.isPending}
+                    >
+                        {logoutMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Sign Out
+                    </Button>
                 </div>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
                 <TabsList className="bg-muted/50 p-1 rounded-xl w-full justify-start overflow-x-auto">
+                    <TabsTrigger value="analytics" className="gap-2"><ShoppingBag className="w-4 h-4" /> Analytics</TabsTrigger>
                     <TabsTrigger value="reservations" className="gap-2"><Calendar className="w-4 h-4" /> Reservations</TabsTrigger>
+                    <TabsTrigger value="orders" className="gap-2"><ShoppingBag className="w-4 h-4" /> Orders</TabsTrigger>
                     <TabsTrigger value="enquiries" className="gap-2"><MessageSquare className="w-4 h-4" /> Enquiries</TabsTrigger>
                     <TabsTrigger value="menu" className="gap-2"><Utensils className="w-4 h-4" /> Menu Management</TabsTrigger>
                     <TabsTrigger value="blogs" className="gap-2"><BookOpen className="w-4 h-4" /> Blogs</TabsTrigger>
                     <TabsTrigger value="newsletter" className="gap-2"><Mail className="w-4 h-4" /> Newsletter</TabsTrigger>
+                    <TabsTrigger value="settings" className="gap-2"><ImageIcon className="w-4 h-4" /> Settings</TabsTrigger>
                 </TabsList>
 
                 {/* Reservations Tab */}
@@ -209,7 +270,10 @@ export default function AdminDashboard() {
                                         <tbody className="divide-y divide-border">
                                             {reservations?.map((res) => (
                                                 <tr key={res.id} className="text-sm">
-                                                    <td className="py-4 px-4 font-medium">{res.name}<br /><span className="text-xs text-muted-foreground">{res.email}</span></td>
+                                                    <td className="py-4 px-4 font-medium">
+                                                        {res.name}<br />
+                                                        <a href={`mailto:${res.email}`} className="text-xs text-muted-foreground hover:text-primary hover:underline">{res.email}</a>
+                                                    </td>
                                                     <td className="py-4 px-4">{res.date} at {res.time}</td>
                                                     <td className="py-4 px-4">{res.guests} people</td>
                                                     <td className="py-4 px-4 italic text-muted-foreground max-w-xs truncate">{res.requests || "None"}</td>
@@ -233,6 +297,103 @@ export default function AdminDashboard() {
                     </div>
                 </TabsContent>
 
+                {/* Orders Tab */}
+                <TabsContent value="orders">
+                    <Card className="border-border/50 shadow-sm">
+                        <CardHeader>
+                            <CardTitle className="font-serif">Incoming Orders</CardTitle>
+                            <CardDescription>View and manage delivery orders. Updating status sends an automated email to the customer.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b border-border text-sm font-medium text-muted-foreground">
+                                            <th className="pb-4 px-4">Order Details</th>
+                                            <th className="pb-4 px-4">Customer Info</th>
+                                            <th className="pb-4 px-4">Items</th>
+                                            <th className="pb-4 px-4">Total</th>
+                                            <th className="pb-4 px-4">Manage Status</th>
+                                            <th className="pb-4 px-4 text-right">Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {orders?.map((order) => (
+                                            <tr key={order.id} className="text-sm">
+                                                <td className="py-4 px-4">
+                                                    <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase tracking-tighter">ID: {order.id.slice(0, 8)}</div>
+                                                    <div className="font-bold flex items-center gap-2">
+                                                        <ShoppingBag className="w-3 h-3 text-primary" />
+                                                        Order #{order.id.slice(-4).toUpperCase()}
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 px-4">
+                                                    <div className="font-medium text-foreground">{order.customerName}</div>
+                                                    <div className="text-xs text-muted-foreground">{order.customerPhone}</div>
+                                                    <div className="text-[10px] text-muted-foreground max-w-[200px] leading-tight mt-1">{order.deliveryAddress}</div>
+                                                </td>
+                                                <td className="py-4 px-4">
+                                                    <div className="space-y-1">
+                                                        {order.items.map((item) => (
+                                                            <div key={item.id} className="text-xs flex justify-between gap-4">
+                                                                <span className="text-muted-foreground">{item.quantity}x {item.itemName}</span>
+                                                                <span className="font-medium">KSh {item.price.toLocaleString()}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 px-4">
+                                                    <div className="font-bold text-primary">KSh {order.totalAmount.toLocaleString()}</div>
+                                                </td>
+                                                <td className="py-4 px-4">
+                                                    <div className="flex flex-col gap-2">
+                                                        <Select
+                                                            defaultValue={order.status}
+                                                            onValueChange={(status) => updateOrderStatus.mutate({ id: order.id, status })}
+                                                        >
+                                                            <SelectTrigger className="w-[160px] h-8 text-xs">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="pending">Pending</SelectItem>
+                                                                <SelectItem value="confirmed">Confirmed</SelectItem>
+                                                                <SelectItem value="preparing">Preparing</SelectItem>
+                                                                <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                                                                <SelectItem value="delivered">Delivered</SelectItem>
+                                                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-7 text-[10px] gap-1"
+                                                            onClick={() => setSendMessageOrderId(order.id)}
+                                                        >
+                                                            <Mail className="w-3 h-3" />
+                                                            Send Message
+                                                        </Button>
+                                                    </div>
+                                                    <div className="mt-1 text-[10px] text-muted-foreground text-center italic">
+                                                        Current: {order.status.replace('_', ' ')}
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 px-4 text-right">
+                                                    <div className="text-xs font-medium">
+                                                        {order.createdAt ? format(new Date(order.createdAt), "MMM d") : "Unknown"}
+                                                    </div>
+                                                    <div className="text-[10px] text-muted-foreground">
+                                                        {order.createdAt ? format(new Date(order.createdAt), "HH:mm") : ""}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
                 {/* Enquiries Tab */}
                 <TabsContent value="enquiries">
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -241,16 +402,25 @@ export default function AdminDashboard() {
                                 <CardHeader className="pb-2">
                                     <div className="flex justify-between items-start">
                                         <CardTitle className="text-lg font-serif">{enq.subject}</CardTitle>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="text-destructive h-8 w-8"
-                                            onClick={() => deleteEnquiry.mutate(enq.id)}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
+                                        <div className="flex gap-2">
+                                            <a href={`mailto:${enq.email}?subject=Re: ${enq.subject}`} title="Reply via Email">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10">
+                                                    <Mail className="w-4 h-4" />
+                                                </Button>
+                                            </a>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-destructive h-8 w-8 hover:text-destructive hover:bg-destructive/10"
+                                                onClick={() => deleteEnquiry.mutate(enq.id)}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <CardDescription>{enq.name} ({enq.email})</CardDescription>
+                                    <CardDescription>
+                                        {enq.name} (<a href={`mailto:${enq.email}`} className="hover:text-primary hover:underline">{enq.email}</a>)
+                                    </CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <p className="text-sm text-muted-foreground italic leading-relaxed">"{enq.message}"</p>
@@ -378,109 +548,375 @@ export default function AdminDashboard() {
                         </CardContent>
                     </Card>
                 </TabsContent>
+                {/* Analytics Tab */}
+                <TabsContent value="analytics">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Total Revenue</CardDescription>
+                                <CardTitle className="text-3xl font-bold">
+                                    KSh {analytics?.totalRevenue?.toLocaleString() || 0}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-muted-foreground">From all completed orders</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Total Orders</CardDescription>
+                                <CardTitle className="text-3xl font-bold">{analytics?.totalOrders || 0}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-muted-foreground">All time</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Reservations</CardDescription>
+                                <CardTitle className="text-3xl font-bold">{analytics?.totalReservations || 0}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-muted-foreground">Total bookings</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Newsletter</CardDescription>
+                                <CardTitle className="text-3xl font-bold">{newsletter?.length || 0}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-muted-foreground">Subscribers</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-2 mt-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Orders by Status</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-2">
+                                    {analytics?.ordersByStatus && Object.entries(analytics.ordersByStatus).map(([status, count]: any) => (
+                                        <div key={status} className="flex justify-between items-center">
+                                            <span className="capitalize">{status.replace('_', ' ')}</span>
+                                            <span className="font-bold">{count}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Top Selling Items</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-2">
+                                    {analytics?.topItems?.map((item: any, index: number) => (
+                                        <div key={index} className="flex justify-between items-center">
+                                            <span className="text-sm">{item.name}</span>
+                                            <span className="font-bold">{item.count} sold</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
+
+                {/* Settings Tab */}
+                <TabsContent value="settings">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Restaurant Settings</CardTitle>
+                            <CardDescription>Configure operational settings for your restaurant</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="space-y-2">
+                                <Label htmlFor="openingHours">Opening Hours</Label>
+                                <Input
+                                    id="openingHours"
+                                    defaultValue={settings?.openingHours || "08:00-22:00"}
+                                    placeholder="08:00-22:00"
+                                />
+                                <p className="text-xs text-muted-foreground">Format: HH:MM-HH:MM</p>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <Label>Online Ordering</Label>
+                                    <p className="text-sm text-muted-foreground">Enable or disable online ordering</p>
+                                </div>
+                                <Button variant="outline">
+                                    {settings?.isOrderingEnabled ? "Enabled" : "Disabled"}
+                                </Button>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="minOrder">Minimum Order Amount (KSh)</Label>
+                                <Input
+                                    id="minOrder"
+                                    type="number"
+                                    defaultValue={settings?.minOrderAmount || 0}
+                                    placeholder="0"
+                                />
+                            </div>
+                            <Button className="w-full">Save Settings</Button>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Menu Item Dialog */}
+                <Dialog open={isMenuDialogOpen} onOpenChange={setIsMenuDialogOpen}>
+                    <DialogContent className="sm:max-w-[600px]">
+                        <DialogHeader>
+                            <DialogTitle>{editingMenuItem ? "Edit Menu Item" : "Add New Menu Item"}</DialogTitle>
+                            <DialogDescription>Fill in the details for your culinary creation.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="name">Item Name</Label>
+                                    <Input id="name" value={menuForm.name} onChange={(e) => setMenuForm({ ...menuForm, name: e.target.value })} placeholder="e.g. Masala Chips" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="category">Category</Label>
+                                    <Input id="category" value={menuForm.category} onChange={(e) => setMenuForm({ ...menuForm, category: e.target.value })} placeholder="e.g. Starters" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="price">Current Price</Label>
+                                    <Input id="price" value={menuForm.price} onChange={(e) => setMenuForm({ ...menuForm, price: e.target.value })} placeholder="KSh 500" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="originalPrice">Original Price (for slashed)</Label>
+                                    <Input id="originalPrice" value={menuForm.originalPrice} onChange={(e) => setMenuForm({ ...menuForm, originalPrice: e.target.value })} placeholder="KSh 650" />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="description">Description</Label>
+                                <Textarea id="description" value={menuForm.description} onChange={(e) => setMenuForm({ ...menuForm, description: e.target.value })} placeholder="Describe the flavors..." />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="tag">Tag (Optional)</Label>
+                                    <Input id="tag" value={menuForm.tag} onChange={(e) => setMenuForm({ ...menuForm, tag: e.target.value })} placeholder="e.g. Popular" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="image">Image URL</Label>
+                                    <Input id="image" value={menuForm.image} onChange={(e) => setMenuForm({ ...menuForm, image: e.target.value })} placeholder="https://..." />
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsMenuDialogOpen(false)}>Cancel</Button>
+                            <Button
+                                className="bg-primary text-white"
+                                onClick={() => saveMenuMutation.mutate(menuForm)}
+                                disabled={saveMenuMutation.isPending}
+                            >
+                                {saveMenuMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {editingMenuItem ? "Update Item" : "Create Item"}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Blog Dialog */}
+                <Dialog open={isBlogDialogOpen} onOpenChange={setIsBlogDialogOpen}>
+                    <DialogContent className="sm:max-w-[700px]">
+                        <DialogHeader>
+                            <DialogTitle>{editingBlog ? "Edit Blog Post" : "Create New Post"}</DialogTitle>
+                            <DialogDescription>Share your Savannah stories with the world.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="title">Title</Label>
+                                <Input id="title" value={blogForm.title} onChange={(e) => setBlogForm({ ...blogForm, title: e.target.value })} placeholder="How to grill like a Maasai..." />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="blogAuthor">Author</Label>
+                                    <Input id="blogAuthor" value={blogForm.author} onChange={(e) => setBlogForm({ ...blogForm, author: e.target.value })} placeholder="Name" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="blogCategory">Category</Label>
+                                    <Input id="blogCategory" value={blogForm.category} onChange={(e) => setBlogForm({ ...blogForm, category: e.target.value })} placeholder="Cuisine" />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="blogImage">Featured Image URL</Label>
+                                <Input id="blogImage" value={blogForm.image} onChange={(e) => setBlogForm({ ...blogForm, image: e.target.value })} placeholder="https://..." />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="content">Content</Label>
+                                <Textarea id="content" className="min-h-[200px]" value={blogForm.content} onChange={(e) => setBlogForm({ ...blogForm, content: e.target.value })} placeholder="Write your story here..." />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsBlogDialogOpen(false)}>Cancel</Button>
+                            <Button
+                                className="bg-primary text-white"
+                                onClick={() => saveBlogMutation.mutate(blogForm)}
+                                disabled={saveBlogMutation.isPending}
+                            >
+                                {saveBlogMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {editingBlog ? "Update Post" : "Publish Post"}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Custom Message Dialog */}
+                <Dialog open={sendMessageOrderId !== null} onOpenChange={(open) => !open && setSendMessageOrderId(null)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Send Message to Customer</DialogTitle>
+                            <DialogDescription>
+                                Send a personalized email update regarding order #{sendMessageOrderId?.slice(-4).toUpperCase()}.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <Label htmlFor="custom-message">Your Message</Label>
+                            <Textarea
+                                id="custom-message"
+                                value={customMessage}
+                                onChange={(e) => setCustomMessage(e.target.value)}
+                                placeholder="Type your message here..."
+                                className="min-h-[150px] mt-2"
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setSendMessageOrderId(null)}>Cancel</Button>
+                            <Button
+                                className="bg-primary text-white"
+                                onClick={() => sendOrderMessage.mutate({ id: sendMessageOrderId!, message: customMessage })}
+                                disabled={sendOrderMessage.isPending || !customMessage.trim()}
+                            >
+                                {sendOrderMessage.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Send Email
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Analytics Tab */}
+                <TabsContent value="analytics">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Total Revenue</CardDescription>
+                                <CardTitle className="text-3xl font-bold">
+                                    KSh {analytics?.totalRevenue?.toLocaleString() || 0}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-muted-foreground">From all completed orders</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Total Orders</CardDescription>
+                                <CardTitle className="text-3xl font-bold">{analytics?.totalOrders || 0}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-muted-foreground">All time</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Reservations</CardDescription>
+                                <CardTitle className="text-3xl font-bold">{analytics?.totalReservations || 0}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-muted-foreground">Total bookings</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardDescription>Newsletter</CardDescription>
+                                <CardTitle className="text-3xl font-bold">{newsletter?.length || 0}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-muted-foreground">Subscribers</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-2 mt-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Orders by Status</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-2">
+                                    {analytics?.ordersByStatus && Object.entries(analytics.ordersByStatus).map(([status, count]: any) => (
+                                        <div key={status} className="flex justify-between items-center">
+                                            <span className="capitalize">{status.replace('_', ' ')}</span>
+                                            <span className="font-bold">{count}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Top Selling Items</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-2">
+                                    {analytics?.topItems?.map((item: any, index: number) => (
+                                        <div key={index} className="flex justify-between items-center">
+                                            <span className="text-sm">{item.name}</span>
+                                            <span className="font-bold">{item.count} sold</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
+
+                {/* Settings Tab */}
+                <TabsContent value="settings">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Restaurant Settings</CardTitle>
+                            <CardDescription>Configure operational settings for your restaurant</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="space-y-2">
+                                <Label htmlFor="openingHours">Opening Hours</Label>
+                                <Input
+                                    id="openingHours"
+                                    defaultValue={settings?.openingHours || "08:00-22:00"}
+                                    placeholder="08:00-22:00"
+                                />
+                                <p className="text-xs text-muted-foreground">Format: HH:MM-HH:MM</p>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <Label>Online Ordering</Label>
+                                    <p className="text-sm text-muted-foreground">Enable or disable online ordering</p>
+                                </div>
+                                <Button variant="outline">
+                                    {settings?.isOrderingEnabled ? "Enabled" : "Disabled"}
+                                </Button>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="minOrder">Minimum Order Amount (KSh)</Label>
+                                <Input
+                                    id="minOrder"
+                                    type="number"
+                                    defaultValue={settings?.minOrderAmount || 0}
+                                    placeholder="0"
+                                />
+                            </div>
+                            <Button className="w-full">Save Settings</Button>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
             </Tabs>
-
-            {/* Menu Item Dialog */}
-            <Dialog open={isMenuDialogOpen} onOpenChange={setIsMenuDialogOpen}>
-                <DialogContent className="sm:max-w-[600px]">
-                    <DialogHeader>
-                        <DialogTitle>{editingMenuItem ? "Edit Menu Item" : "Add New Menu Item"}</DialogTitle>
-                        <DialogDescription>Fill in the details for your culinary creation.</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="name">Item Name</Label>
-                                <Input id="name" value={menuForm.name} onChange={(e) => setMenuForm({ ...menuForm, name: e.target.value })} placeholder="e.g. Masala Chips" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="category">Category</Label>
-                                <Input id="category" value={menuForm.category} onChange={(e) => setMenuForm({ ...menuForm, category: e.target.value })} placeholder="e.g. Starters" />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="price">Current Price</Label>
-                                <Input id="price" value={menuForm.price} onChange={(e) => setMenuForm({ ...menuForm, price: e.target.value })} placeholder="KSh 500" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="originalPrice">Original Price (for slashed)</Label>
-                                <Input id="originalPrice" value={menuForm.originalPrice} onChange={(e) => setMenuForm({ ...menuForm, originalPrice: e.target.value })} placeholder="KSh 650" />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea id="description" value={menuForm.description} onChange={(e) => setMenuForm({ ...menuForm, description: e.target.value })} placeholder="Describe the flavors..." />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="tag">Tag (Optional)</Label>
-                                <Input id="tag" value={menuForm.tag} onChange={(e) => setMenuForm({ ...menuForm, tag: e.target.value })} placeholder="e.g. Popular" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="image">Image URL</Label>
-                                <Input id="image" value={menuForm.image} onChange={(e) => setMenuForm({ ...menuForm, image: e.target.value })} placeholder="https://..." />
-                            </div>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsMenuDialogOpen(false)}>Cancel</Button>
-                        <Button
-                            className="bg-primary text-white"
-                            onClick={() => saveMenuMutation.mutate(menuForm)}
-                            disabled={saveMenuMutation.isPending}
-                        >
-                            {saveMenuMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {editingMenuItem ? "Update Item" : "Create Item"}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Blog Dialog */}
-            <Dialog open={isBlogDialogOpen} onOpenChange={setIsBlogDialogOpen}>
-                <DialogContent className="sm:max-w-[700px]">
-                    <DialogHeader>
-                        <DialogTitle>{editingBlog ? "Edit Blog Post" : "Create New Post"}</DialogTitle>
-                        <DialogDescription>Share your Savannah stories with the world.</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="title">Title</Label>
-                            <Input id="title" value={blogForm.title} onChange={(e) => setBlogForm({ ...blogForm, title: e.target.value })} placeholder="How to grill like a Maasai..." />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="blogAuthor">Author</Label>
-                                <Input id="blogAuthor" value={blogForm.author} onChange={(e) => setBlogForm({ ...blogForm, author: e.target.value })} placeholder="Name" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="blogCategory">Category</Label>
-                                <Input id="blogCategory" value={blogForm.category} onChange={(e) => setBlogForm({ ...blogForm, category: e.target.value })} placeholder="Cuisine" />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="blogImage">Featured Image URL</Label>
-                            <Input id="blogImage" value={blogForm.image} onChange={(e) => setBlogForm({ ...blogForm, image: e.target.value })} placeholder="https://..." />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="content">Content</Label>
-                            <Textarea id="content" className="min-h-[200px]" value={blogForm.content} onChange={(e) => setBlogForm({ ...blogForm, content: e.target.value })} placeholder="Write your story here..." />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsBlogDialogOpen(false)}>Cancel</Button>
-                        <Button
-                            className="bg-primary text-white"
-                            onClick={() => saveBlogMutation.mutate(blogForm)}
-                            disabled={saveBlogMutation.isPending}
-                        >
-                            {saveBlogMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {editingBlog ? "Update Post" : "Publish Post"}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }

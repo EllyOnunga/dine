@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupMiddleware } from "./middleware";
+import { setupAuth } from "./auth";
 import { logger, httpLogger } from "./logger";
 
 const app = express();
@@ -29,6 +30,9 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// Auth needs body parsing for login/register
+setupAuth(app);
 
 (async () => {
   await registerRoutes(httpServer, app);

@@ -1,10 +1,15 @@
-import { MenuItem, Reservation, NewsletterLead, InsertUser, User, InsertReservation, Blog, Enquiry, InsertBlog, InsertEnquiry } from "@shared/schema";
-import { users, menuItems, reservations, newsletterLeads, blogs, enquiries } from "@shared/schema";
-import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { MenuItem, Reservation, NewsletterLead, InsertUser, User, InsertReservation, Blog, Enquiry, InsertBlog, InsertEnquiry, Order, OrderItem, InsertOrder, SiteSetting, Suite, InsertSuite } from "@shared/schema";
+import { users, menuItems, reservations, newsletterLeads, blogs, enquiries, orders, orderItems, siteSettings, suites } from "@shared/schema";
+import { db, pool } from "./db";
+import { eq, sql, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
+  sessionStore: session.Store;
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
@@ -37,10 +42,37 @@ export interface IStorage {
   createEnquiry(enquiry: InsertEnquiry): Promise<Enquiry>;
   getEnquiries(): Promise<Enquiry[]>;
   deleteEnquiry(id: string): Promise<void>;
+
+  // Orders
+  createOrder(order: InsertOrder): Promise<Order>;
+  getOrders(): Promise<(Order & { items: OrderItem[] })[]>;
+  getOrder(id: string): Promise<(Order & { items: OrderItem[] }) | undefined>;
+  updateOrder(id: string, status: string): Promise<Order>;
+
+  // Site Settings
+  getSiteSettings(): Promise<SiteSetting>;
+  updateSiteSettings(settings: Partial<SiteSetting>): Promise<SiteSetting>;
+
+  // User Loyalty
+  updateUserPoints(userId: string, points: number): Promise<User>;
+
+  // Suites
+  getSuites(): Promise<Suite[]>;
+  getSuite(id: string): Promise<Suite | undefined>;
+  seedSuites(suites: Suite[]): Promise<void>;
+
   healthCheck(): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
+  sessionStore: session.Store;
+
+  constructor() {
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: false,
+    });
+  }
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -147,9 +179,83 @@ export class DatabaseStorage implements IStorage {
   async deleteEnquiry(id: string): Promise<void> {
     await db.delete(enquiries).where(eq(enquiries.id, id));
   }
+
+  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+    const { items, ...orderData } = insertOrder;
+    const [newOrder] = await db.insert(orders).values(orderData).returning();
+
+    if (items && items.length > 0) {
+      await db.insert(orderItems).values(
+        items.map(item => ({ ...item, orderId: newOrder.id }))
+      );
+    }
+
+    return newOrder;
+  }
+
+  async getOrders(): Promise<(Order & { items: OrderItem[] })[]> {
+    const allOrders = await db.select().from(orders).orderBy(sql`${orders.createdAt} DESC`);
+    const allItems = await db.select().from(orderItems);
+
+    return allOrders.map(order => ({
+      ...order,
+      items: allItems.filter(item => item.orderId === order.id)
+    }));
+  }
+
+  async getOrder(id: string): Promise<(Order & { items: OrderItem[] }) | undefined> {
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    if (!order) return undefined;
+
+    const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id));
+    return { ...order, items };
+  }
+
+  async updateOrder(id: string, status: string): Promise<Order> {
+    const [updatedOrder] = await db
+      .update(orders)
+      .set({ status })
+      .where(eq(orders.id, id))
+      .returning();
+    return updatedOrder;
+  }
+
+  async getSiteSettings(): Promise<SiteSetting> {
+    const [settings] = await db.select().from(siteSettings).limit(1);
+    if (!settings) {
+      const [newSettings] = await db.insert(siteSettings).values({ id: "default" }).returning();
+      return newSettings;
+    }
+    return settings;
+  }
+
+  async updateSiteSettings(settings: Partial<SiteSetting>): Promise<SiteSetting> {
+    const [updated] = await db.update(siteSettings).set(settings).where(eq(siteSettings.id, "default")).returning();
+    return updated;
+  }
+
+  async updateUserPoints(userId: string, points: number): Promise<User> {
+    const [user] = await db.update(users).set({ loyaltyPoints: points }).where(eq(users.id, userId)).returning();
+    return user;
+  }
+
+  async getSuites(): Promise<Suite[]> {
+    return await db.select().from(suites);
+  }
+
+  async getSuite(id: string): Promise<Suite | undefined> {
+    const [suite] = await db.select().from(suites).where(eq(suites.id, id));
+    return suite;
+  }
+
+  async seedSuites(items: Suite[]): Promise<void> {
+    if (items.length === 0) return;
+    await db.insert(suites).values(items);
+  }
+
   async healthCheck(): Promise<boolean> {
     try {
-      await db.execute(require("drizzle-orm").sql`SELECT 1`);
+      await db.execute(sql`SELECT 1`);
       return true;
     } catch (e) {
       return false;
@@ -162,12 +268,20 @@ export class MemStorage implements IStorage {
   private menuItems: MenuItem[];
   private reservations: Reservation[];
   private newsletterLeads: Map<string, NewsletterLead>;
+  private orders: Map<string, Order>;
+  private orderItems: OrderItem[];
+  private suites: Suite[];
+  sessionStore: session.Store;
 
   constructor() {
     this.users = new Map();
     this.menuItems = [];
     this.reservations = [];
     this.newsletterLeads = new Map();
+    this.orders = new Map();
+    this.orderItems = [];
+    this.suites = [];
+    this.sessionStore = new session.MemoryStore();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -182,7 +296,7 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
+    const user: User = { ...insertUser, id, loyaltyPoints: 0 };
     this.users.set(id, user);
     return user;
   }
@@ -274,6 +388,79 @@ export class MemStorage implements IStorage {
   }
 
   async deleteEnquiry(id: string): Promise<void> { }
+
+  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+    const { items, ...orderData } = insertOrder;
+    const id = randomUUID();
+    const newOrder: Order = {
+      ...orderData,
+      id,
+      createdAt: new Date(),
+      status: "pending",
+      paymentMethod: orderData.paymentMethod ?? "cash",
+      paymentStatus: "pending"
+    };
+    this.orders.set(id, newOrder);
+
+    if (items) {
+      items.forEach(item => {
+        this.orderItems.push({ ...item, id: randomUUID(), orderId: id });
+      });
+    }
+    return newOrder;
+  }
+
+  async getOrders(): Promise<(Order & { items: OrderItem[] })[]> {
+    return Array.from(this.orders.values()).map(order => ({
+      ...order,
+      items: this.orderItems.filter(item => item.orderId === order.id)
+    }));
+  }
+
+  async getOrder(id: string): Promise<(Order & { items: OrderItem[] }) | undefined> {
+    const order = this.orders.get(id);
+    if (!order) return undefined;
+    return {
+      ...order,
+      items: this.orderItems.filter(item => item.orderId === order.id)
+    };
+  }
+
+  async updateOrder(id: string, status: string): Promise<Order> {
+    const order = this.orders.get(id);
+    if (!order) throw new Error("Order not found");
+    const updatedOrder = { ...order, status };
+    this.orders.set(id, updatedOrder);
+    return updatedOrder;
+  }
+
+  async getSiteSettings(): Promise<SiteSetting> {
+    return { id: "default", openingHours: "08:00-22:00", isOrderingEnabled: true, minOrderAmount: 0 };
+  }
+
+  async updateSiteSettings(settings: Partial<SiteSetting>): Promise<SiteSetting> {
+    return { ...await this.getSiteSettings(), ...settings };
+  }
+
+  async updateUserPoints(userId: string, points: number): Promise<User> {
+    const user = Array.from(this.users.values()).find(u => u.id === userId);
+    if (!user) throw new Error("User not found");
+    const updated = { ...user, loyaltyPoints: points };
+    this.users.set(user.id, updated);
+    return updated;
+  }
+
+  async getSuites(): Promise<Suite[]> {
+    return this.suites;
+  }
+
+  async getSuite(id: string): Promise<Suite | undefined> {
+    return this.suites.find(s => s.id === id);
+  }
+
+  async seedSuites(items: Suite[]): Promise<void> {
+    this.suites = items;
+  }
 
   async deleteReservation(id: string): Promise<void> {
     this.reservations = this.reservations.filter(r => r.id !== id);

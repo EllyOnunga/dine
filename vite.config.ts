@@ -30,7 +30,7 @@ export default defineConfig({
     strictPort: true,
     allowedHosts: true,
     hmr: {
-      clientPort: 3000,
+      clientPort: 443,
       path: "/vite-hmr",
     },
     fs: {
