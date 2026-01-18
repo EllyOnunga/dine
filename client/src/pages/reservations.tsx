@@ -87,7 +87,7 @@ export default function Reservations() {
                       <div className="space-y-2">
                         <Label htmlFor="time">Time</Label>
                         <Select onValueChange={(val) => form.setValue("time", val)}>
-                          <SelectTrigger className="pl-10 relative">
+                          <SelectTrigger id="time" className="pl-10 relative">
                             <Clock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <SelectValue placeholder="Select time" />
                           </SelectTrigger>
@@ -103,7 +103,7 @@ export default function Reservations() {
                       <div className="space-y-2">
                         <Label htmlFor="guests">Guests</Label>
                         <Select onValueChange={(val) => form.setValue("guests", parseInt(val))}>
-                          <SelectTrigger className="pl-10 relative">
+                          <SelectTrigger id="guests" className="pl-10 relative">
                             <Users className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <SelectValue placeholder="How many?" />
                           </SelectTrigger>
@@ -119,11 +119,11 @@ export default function Reservations() {
                     <div className="grid md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <Label htmlFor="name">Full Name</Label>
-                        <Input id="name" {...form.register("name")} placeholder="John Doe" />
+                        <Input id="name" autoComplete="name" {...form.register("name")} placeholder="John Doe" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" {...form.register("email")} placeholder="john@example.com" />
+                        <Input id="email" type="email" autoComplete="email" {...form.register("email")} placeholder="john@example.com" />
                       </div>
                     </div>
 

@@ -61,14 +61,14 @@ function LoginForm() {
         <form onSubmit={form.handleSubmit((data) => loginMutation.mutate(data))} className="space-y-4">
             <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
-                <Input id="username" {...form.register("username")} />
+                <Input id="username" autoComplete="username" {...form.register("username")} />
                 {form.formState.errors.username && (
                     <p className="text-sm text-destructive">{form.formState.errors.username.message}</p>
                 )}
             </div>
             <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" {...form.register("password")} />
+                <Input id="password" type="password" autoComplete="current-password" {...form.register("password")} />
                 {form.formState.errors.password && (
                     <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
                 )}
@@ -96,14 +96,14 @@ function RegisterForm() {
         <form onSubmit={form.handleSubmit((data) => registerMutation.mutate({ ...data, isAdmin: true }))} className="space-y-4">
             <div className="space-y-2">
                 <Label htmlFor="reg-username">Username</Label>
-                <Input id="reg-username" {...form.register("username")} />
+                <Input id="reg-username" autoComplete="username" {...form.register("username")} />
                 {form.formState.errors.username && (
                     <p className="text-sm text-destructive">{form.formState.errors.username.message}</p>
                 )}
             </div>
             <div className="space-y-2">
                 <Label htmlFor="reg-password">Password</Label>
-                <Input id="reg-password" type="password" {...form.register("password")} />
+                <Input id="reg-password" type="password" autoComplete="new-password" {...form.register("password")} />
                 {form.formState.errors.password && (
                     <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
                 )}

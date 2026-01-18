@@ -7,7 +7,8 @@ const poolConfig: PoolConfig = {
 };
 
 // Enable SSL for RDS and other managed databases in production
-if (process.env.NODE_ENV === 'production') {
+// But allow disabling it for local production-like Docker setups via DISABLE_DB_SSL
+if (process.env.NODE_ENV === 'production' && process.env.DISABLE_DB_SSL !== 'true') {
     poolConfig.ssl = {
         rejectUnauthorized: false
     };

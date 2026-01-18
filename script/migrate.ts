@@ -45,6 +45,9 @@ async function runMigrations() {
         throw new Error(`Migrations directory not found at ${migrationsFolder}. Did you run 'npm run db:generate'?`);
     }
 
+    const migrationFiles = fs.readdirSync(migrationsFolder);
+    console.log('Found migration files:', migrationFiles);
+
     console.log('Running migrations...');
 
     try {

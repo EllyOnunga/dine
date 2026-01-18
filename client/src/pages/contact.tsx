@@ -144,6 +144,7 @@ function ContactForm() {
           <Input
             id="name"
             placeholder="Juma Japhary"
+            autoComplete="name"
             required
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -155,6 +156,7 @@ function ContactForm() {
             id="email"
             type="email"
             placeholder="juma@example.com"
+            autoComplete="email"
             required
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
