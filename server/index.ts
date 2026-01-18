@@ -21,13 +21,7 @@ setupMiddleware(app);
 
 app.use(httpLogger);
 
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  }),
-);
+app.use(express.json());
 
 app.use(express.urlencoded({ extended: false }));
 

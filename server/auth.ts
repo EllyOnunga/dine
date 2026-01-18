@@ -23,6 +23,12 @@ async function comparePasswords(supplied: string, stored: string) {
     return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+// Utility to strip password from user object
+function stripPassword(user: SelectUser) {
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+}
+
 export function setupAuth(app: Express) {
     const sessionSettings: session.SessionOptions = {
         secret: process.env.SESSION_SECRET || "savor_secret_key",
@@ -57,8 +63,7 @@ export function setupAuth(app: Express) {
     });
 
     app.post("/api/login", passport.authenticate("local"), (req, res) => {
-        const { password, ...user } = req.user as SelectUser;
-        res.status(200).json(user);
+        res.status(200).json(stripPassword(req.user as SelectUser));
     });
 
     app.post("/api/register", async (req, res, next) => {
@@ -78,8 +83,7 @@ export function setupAuth(app: Express) {
 
             req.login(user, (err) => {
                 if (err) return next(err);
-                const { password, ...userWithoutPassword } = user;
-                res.status(201).json(userWithoutPassword);
+                res.status(201).json(stripPassword(user));
             });
         } catch (err) {
             if (err instanceof ZodError) {
@@ -98,7 +102,6 @@ export function setupAuth(app: Express) {
 
     app.get("/api/user", (req, res) => {
         if (!req.isAuthenticated()) return res.sendStatus(401);
-        const { password, ...user } = req.user as SelectUser;
-        res.json(user);
+        res.json(stripPassword(req.user as SelectUser));
     });
 }
