@@ -120,12 +120,12 @@ export async function registerRoutes(
 
   app.post("/api/newsletter", async (req, res) => {
     try {
-      const { email } = insertNewsletterSchema.parse(req.body);
-      const lead = await storage.addNewsletterLead(email);
+      const data = insertNewsletterSchema.parse(req.body);
+      const lead = await storage.addNewsletterLead(data.email);
 
       // Send welcome email (don't await to avoid blocking)
-      sendNewsletterWelcome(email).catch(err =>
-        logger.error({ err, email }, 'Failed to send newsletter welcome')
+      sendNewsletterWelcome(data.email).catch(err =>
+        logger.error({ err, email: data.email }, 'Failed to send newsletter welcome')
       );
 
       res.status(201).json(lead);
@@ -259,35 +259,38 @@ export async function registerRoutes(
     try {
       const { status } = req.body;
       if (!status) return res.status(400).json({ message: "Status is required" });
+      
+      const validStatuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status value" });
+      }
 
       const order = await storage.updateOrder(req.params.id, status);
       if (!order) return res.status(404).json({ message: "Order not found" });
 
       // Notify customer (don't await)
-      const fullOrder = await storage.getOrder(order.id);
+      const fullOrder = await storage.getOrder(order._id.toString());
       if (fullOrder) {
         if (status === 'confirmed') {
-          // Special confirmation email with full details
           sendOrderDetailsEmail({
-            orderId: fullOrder.id,
+            orderId: fullOrder._id.toString(),
             customerName: fullOrder.customerName,
             customerEmail: fullOrder.customerEmail,
             customerPhone: fullOrder.customerPhone,
             deliveryAddress: fullOrder.deliveryAddress,
             totalAmount: fullOrder.totalAmount,
             paymentMethod: fullOrder.paymentMethod,
-            createdAt: fullOrder.createdAt!,
+            createdAt: fullOrder.createdAt,
             status: "confirmed",
             items: fullOrder.items
-          }).catch(err => logger.error({ err, orderId: fullOrder.id }, 'Failed to send order confirmation email'));
+          }).catch(err => logger.error({ err, orderId: fullOrder._id.toString() }, 'Failed to send order confirmation email'));
         } else {
-          logger.info({ orderId: order.id, status: order.status, email: order.customerEmail }, 'Triggering order status update email');
           sendOrderStatusUpdate({
             customerName: order.customerName,
             customerEmail: order.customerEmail,
-            orderId: order.id,
+            orderId: order._id.toString(),
             status: order.status
-          }).catch(err => logger.error({ err, orderId: order.id }, 'Failed to send status update email'));
+          }).catch(err => logger.error({ err, orderId: order._id.toString() }, 'Failed to send status update email'));
         }
       }
 
@@ -303,14 +306,14 @@ export async function registerRoutes(
       if (!message) return res.status(400).json({ message: "Message is required" });
 
       const orders = await storage.getOrders();
-      const order = orders.find(o => o.id === req.params.id);
+      const order = orders.find(o => o._id.toString() === req.params.id);
 
       if (!order) return res.status(404).json({ message: "Order not found" });
 
       await sendOrderCustomMessage({
         customerName: order.customerName,
         customerEmail: order.customerEmail,
-        orderId: order.id,
+        orderId: order._id.toString(),
         message: message
       });
 
@@ -341,30 +344,30 @@ export async function registerRoutes(
       const order = await storage.createOrder(orderData);
 
       // Automated Receipt & Admin Notification
-      const fullOrder = await storage.getOrder(order.id);
+      const fullOrder = await storage.getOrder(order._id.toString());
       if (fullOrder) {
         // Prepare common data
         const emailData = {
-          orderId: fullOrder.id,
+          orderId: fullOrder._id.toString(),
           customerName: fullOrder.customerName,
           customerEmail: fullOrder.customerEmail,
           customerPhone: fullOrder.customerPhone,
           deliveryAddress: fullOrder.deliveryAddress,
           totalAmount: fullOrder.totalAmount,
           paymentMethod: fullOrder.paymentMethod,
-          createdAt: fullOrder.createdAt!,
+          createdAt: fullOrder.createdAt,
           status: "received",
           items: fullOrder.items
         };
 
         // Send customer receipt
         sendOrderDetailsEmail(emailData).catch(err =>
-          logger.error({ err, orderId: fullOrder.id }, 'Failed to send customer order email')
+          logger.error({ err, orderId: fullOrder._id.toString() }, 'Failed to send customer order email')
         );
 
         // Send admin notification
         sendOrderNotificationToAdmin(emailData).catch(err =>
-          logger.error({ err, orderId: fullOrder.id }, 'Failed to send admin order notification')
+          logger.error({ err, orderId: fullOrder._id.toString() }, 'Failed to send admin order notification')
         );
       }
 
@@ -384,14 +387,14 @@ export async function registerRoutes(
       const orders = await storage.getOrders();
       const orderId = req.params.id.replace('#', '').toLowerCase();
       const order = orders.find(o =>
-        o.id.toLowerCase() === orderId ||
-        o.id.toLowerCase().endsWith(orderId)
+        o._id.toString().toLowerCase() === orderId ||
+        o._id.toString().toLowerCase().endsWith(orderId)
       );
 
       if (!order) return res.status(404).json({ message: "Order not found" });
 
       res.json({
-        id: order.id,
+        id: order._id.toString(),
         status: order.status,
         customerName: order.customerName,
         createdAt: order.createdAt,

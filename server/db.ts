@@ -1,18 +1,31 @@
-import { Pool, PoolConfig } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import * as schema from "@shared/schema";
+import { MongoClient, Db } from "mongodb";
 
-const poolConfig: PoolConfig = {
-    connectionString: process.env.DATABASE_URL || "postgres://localhost:5432/postgres",
-};
+const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/dine_db";
 
-// Enable SSL for RDS and other managed databases in production
-// But allow disabling it for local production-like Docker setups via DISABLE_DB_SSL
-if (process.env.NODE_ENV === 'production' && process.env.DISABLE_DB_SSL !== 'true') {
-    poolConfig.ssl = {
-        rejectUnauthorized: false
-    };
+export const client = new MongoClient(uri, {
+  serverSelectionTimeoutMS: 30000,
+  connectTimeoutMS: 30000,
+});
+
+let db: Db;
+
+export async function connectToDatabase(): Promise<Db> {
+  if (!db) {
+    await client.connect();
+    db = client.db();
+    console.log(`Connected to MongoDB: ${db.databaseName}`);
+  }
+  return db;
 }
 
-export const pool = new Pool(poolConfig);
-export const db = drizzle(pool, { schema });
+export function getDb(): Db {
+  if (!db) {
+    throw new Error("Database not initialized. Call connectToDatabase() first.");
+  }
+  return db;
+}
+
+export async function closeDatabase(): Promise<void> {
+  await client.close();
+  db = undefined as unknown as Db;
+}

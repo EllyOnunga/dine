@@ -1,165 +1,144 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, index } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
+import { ObjectId } from "mongodb";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  isAdmin: boolean("is_admin").notNull().default(false),
-  loyaltyPoints: integer("loyalty_points").notNull().default(0),
+export const insertUserSchema = z.object({
+  username: z.string().min(1).max(100),
+  password: z.string().min(6),
+  isAdmin: z.boolean().default(false),
+  loyaltyPoints: z.number().int().min(0).default(0),
 });
 
-export const menuItems = pgTable("menu_items", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  price: text("price").notNull(),
-  originalPrice: text("original_price"),
-  description: text("description").notNull(),
-  category: text("category").notNull(),
-  tag: text("tag"),
-  image: text("image").notNull(),
-  isAvailable: boolean("is_available").notNull().default(true),
-  isFeatured: boolean("is_featured").notNull().default(false),
-  rating: integer("rating").default(5),
-}, (table) => [
-  index("idx_menu_items_category").on(table.category),
-]);
-
-export const siteSettings = pgTable("site_settings", {
-  id: varchar("id").primaryKey().default("default"),
-  openingHours: text("opening_hours").notNull().default('08:00-22:00'),
-  isOrderingEnabled: boolean("is_ordering_enabled").notNull().default(true),
-  minOrderAmount: integer("min_order_amount").notNull().default(0),
+export const insertMenuItemSchema = z.object({
+  name: z.string().min(1),
+  price: z.string(),
+  originalPrice: z.string().optional(),
+  description: z.string().min(1),
+  category: z.string().min(1),
+  tag: z.string().optional(),
+  image: z.string().min(1),
+  isAvailable: z.boolean().default(true),
+  isFeatured: z.boolean().default(false),
+  rating: z.number().int().min(1).max(5).default(5),
 });
 
-export const reservations = pgTable("reservations", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  email: text("email").notNull(),
-  date: text("date").notNull(),
-  time: text("time").notNull(),
-  guests: integer("guests").notNull(),
-  requests: text("requests"),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  index("idx_reservations_date").on(table.date),
-]);
-
-export const newsletterLeads = pgTable("newsletter_leads", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: text("email").notNull().unique(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const blogs = pgTable("blogs", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  title: text("title").notNull(),
-  content: text("content").notNull(),
-  author: text("author").notNull(),
-  image: text("image").notNull(),
-  category: text("category").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  index("idx_blogs_created_at").on(table.createdAt),
-]);
-
-export const enquiries = pgTable("enquiries", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  email: text("email").notNull(),
-  subject: text("subject").notNull(),
-  message: text("message").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const suites = pgTable("suites", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  description: text("description").notNull(),
-  pricePerNight: integer("price_per_night").notNull(),
-  image: text("image").notNull(),
-  amenities: text("amenities").array(),
-  isAvailable: boolean("is_available").notNull().default(true),
-});
-
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-  isAdmin: true,
-}).extend({
-  isAdmin: z.boolean(),
-});
-
-export const insertMenuItemSchema = createInsertSchema(menuItems);
-export const insertReservationSchema = createInsertSchema(reservations, {
-  requests: z.string().nullable(),
-}).omit({
-  id: true,
-  createdAt: true
-}).extend({
+export const insertReservationSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  date: z.string().min(1),
+  time: z.string().min(1),
   guests: z.coerce.number().min(1).max(20),
+  requests: z.string().nullable().optional(),
 });
-export const insertNewsletterSchema = createInsertSchema(newsletterLeads).extend({
+
+export const insertNewsletterSchema = z.object({
   email: z.string().email(),
 });
-export const insertBlogSchema = createInsertSchema(blogs);
-export const insertEnquirySchema = createInsertSchema(enquiries).extend({
+
+export const insertBlogSchema = z.object({
+  title: z.string().min(1),
+  content: z.string().min(1),
+  author: z.string().min(1),
+  image: z.string().min(1),
+  category: z.string().min(1),
+});
+
+export const insertEnquirySchema = z.object({
+  name: z.string().min(1),
   email: z.string().email(),
-});
-export const insertSuiteSchema = createInsertSchema(suites);
-
-export const orders = pgTable("orders", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  customerName: text("customer_name").notNull(),
-  customerEmail: text("customer_email").notNull(),
-  customerPhone: text("customer_phone").notNull(),
-  deliveryAddress: text("delivery_address").notNull(),
-  totalAmount: integer("total_amount").notNull(),
-  paymentMethod: text("payment_method").notNull().default("cash"),
-  paymentStatus: text("payment_status").notNull().default("pending"),
-  status: text("status").notNull().default("pending"),
-  createdAt: timestamp("created_at").defaultNow(),
+  subject: z.string().min(1),
+  message: z.string().min(1),
 });
 
-export const orderItems = pgTable("order_items", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  orderId: varchar("order_id").notNull(),
-  menuItemId: varchar("menu_item_id").notNull(),
-  quantity: integer("quantity").notNull(),
-  price: integer("price").notNull(),
-  itemName: text("item_name").notNull(),
+export const insertSuiteSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().min(1),
+  pricePerNight: z.number().int().min(0),
+  image: z.string().min(1),
+  amenities: z.array(z.string()).default([]),
+  isAvailable: z.boolean().default(true),
 });
 
-export const insertOrderSchema = createInsertSchema(orders).omit({
-  id: true,
-  createdAt: true,
-  status: true,
-  paymentStatus: true,
-}).extend({
+export const insertOrderSchema = z.object({
+  customerName: z.string().min(1),
   customerEmail: z.string().email(),
+  customerPhone: z.string().min(1),
+  deliveryAddress: z.string().min(1),
+  totalAmount: z.number().int().min(0),
+  paymentMethod: z.string().default("cash"),
+  paymentStatus: z.string().default("pending"),
+  status: z.string().default("pending"),
   items: z.array(z.object({
     menuItemId: z.string(),
-    quantity: z.number().min(1),
+    quantity: z.number().int().min(1),
     price: z.number(),
     itemName: z.string(),
   })),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type InsertMenuItem = z.infer<typeof insertMenuItemSchema>;
 export type InsertReservation = z.infer<typeof insertReservationSchema>;
+export type InsertNewsletter = z.infer<typeof insertNewsletterSchema>;
 export type InsertBlog = z.infer<typeof insertBlogSchema>;
 export type InsertEnquiry = z.infer<typeof insertEnquirySchema>;
-export type InsertOrder = z.infer<typeof insertOrderSchema>;
-export type SiteSetting = typeof siteSettings.$inferSelect;
-export type User = typeof users.$inferSelect;
-export type MenuItem = typeof menuItems.$inferSelect;
-export type Reservation = typeof reservations.$inferSelect;
-export type NewsletterLead = typeof newsletterLeads.$inferSelect;
-export type Blog = typeof blogs.$inferSelect;
-export type Enquiry = typeof enquiries.$inferSelect;
-export type Order = typeof orders.$inferSelect;
-export type OrderItem = typeof orderItems.$inferSelect;
-export type Suite = typeof suites.$inferSelect;
 export type InsertSuite = z.infer<typeof insertSuiteSchema>;
+export type InsertOrder = z.infer<typeof insertOrderSchema>;
+
+export interface User extends InsertUser {
+  _id: ObjectId;
+  createdAt?: Date;
+}
+
+export interface MenuItem extends InsertMenuItem {
+  _id: ObjectId;
+  createdAt?: Date;
+}
+
+export interface Reservation extends Omit<InsertReservation, "guests"> {
+  _id: ObjectId;
+  guests: number;
+  createdAt: Date;
+}
+
+export interface NewsletterLead extends InsertNewsletter {
+  _id: ObjectId;
+  createdAt: Date;
+}
+
+export interface Blog extends InsertBlog {
+  _id: ObjectId;
+  createdAt: Date;
+}
+
+export interface Enquiry extends InsertEnquiry {
+  _id: ObjectId;
+  createdAt: Date;
+}
+
+export interface Suite extends InsertSuite {
+  _id: ObjectId;
+  createdAt?: Date;
+}
+
+export interface OrderItem {
+  _id?: ObjectId;
+  orderId: string;
+  menuItemId: string;
+  quantity: number;
+  price: number;
+  itemName: string;
+}
+
+export interface Order extends Omit<InsertOrder, "items"> {
+  _id: ObjectId;
+  items: OrderItem[];
+  createdAt: Date;
+}
+
+export interface SiteSetting {
+  _id?: ObjectId;
+  id: string;
+  openingHours: string;
+  isOrderingEnabled: boolean;
+  minOrderAmount: number;
+}

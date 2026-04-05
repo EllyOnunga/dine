@@ -2,7 +2,7 @@ services:
   app:
     build: .
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin}@db:5432/${POSTGRES_DB:-dine_db}
+      - MONGODB_URI=mongodb://mongo:27017/dine_db
       - SESSION_SECRET=${SESSION_SECRET}
       - NODE_ENV=production
       - SMTP_HOST=${SMTP_HOST}
@@ -12,21 +12,17 @@ services:
       - SMTP_PASS=${SMTP_PASS}
       - ADMIN_EMAIL=${ADMIN_EMAIL}
     depends_on:
-      db:
+      mongo:
         condition: service_healthy
     networks:
       - app-network
 
-  db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER:-admin}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin}
-      - POSTGRES_DB=${POSTGRES_DB:-dine_db}
+  mongo:
+    image: mongo:7
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mongo_data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d dine_db"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -49,7 +45,6 @@ services:
       - app-network
     restart: unless-stopped
 
-  # Certbot for Let's Encrypt SSL certificates
   certbot:
     image: certbot/certbot:latest
     volumes:
@@ -60,7 +55,7 @@ services:
       - app-network
 
 volumes:
-  postgres_data:
+  mongo_data:
   certbot_www:
 
 networks:

@@ -6,6 +6,7 @@ import { createServer } from "http";
 import { setupMiddleware } from "./middleware";
 import { setupAuth } from "./auth";
 import { logger, httpLogger } from "./logger";
+import { connectToDatabase, closeDatabase } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
@@ -16,7 +17,6 @@ declare module "http" {
   }
 }
 
-// Security and performance middleware (before body parsing)
 setupMiddleware(app);
 
 app.use(httpLogger);
@@ -25,18 +25,23 @@ app.use(express.json());
 
 app.use(express.urlencoded({ extended: false }));
 
-// Auth needs body parsing for login/register
-setupAuth(app);
-
 (async () => {
+  try {
+    await connectToDatabase();
+    logger.info("Database connected successfully");
+  } catch (err) {
+    logger.error({ err }, "Failed to connect to database");
+    process.exit(1);
+  }
+
+  setupAuth(app);
+
   await registerRoutes(httpServer, app);
 
-  // Error handling middleware (must be after all routes)
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    // Log error details using structured logger
     logger.error({
       err,
       status,
@@ -44,7 +49,6 @@ setupAuth(app);
       method: _req.method,
     }, message);
 
-    // Don't expose stack traces in production
     const response: any = { message };
     if (process.env.NODE_ENV !== "production") {
       response.stack = err.stack;
@@ -53,9 +57,6 @@ setupAuth(app);
     res.status(status).json(response);
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
@@ -63,10 +64,6 @@ setupAuth(app);
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "3000", 10);
   httpServer.listen(
     {
@@ -79,16 +76,16 @@ setupAuth(app);
     },
   );
 
-  // Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info(`${signal} received, shutting down gracefully...`);
 
-    httpServer.close(() => {
+    httpServer.close(async () => {
+      await closeDatabase();
+      logger.info("Database connection closed");
       logger.info("HTTP server closed");
       process.exit(0);
     });
 
-    // Force shutdown after 10 seconds
     setTimeout(() => {
       logger.fatal("Forcing shutdown after timeout");
       process.exit(1);

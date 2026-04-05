@@ -4,31 +4,29 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/dine_db
+      - MONGODB_URI=mongodb://mongo:27017/dine_db
       - SESSION_SECRET=dev_secret_key_change_in_production
       - NODE_ENV=production
-      - DISABLE_DB_SSL=true
-      # - SMTP_HOST=smtp.gmail.com
-      # - SMTP_PORT=587
-      # - SMTP_USER=your_email@gmail.com
-      # - SMTP_PASS=your_password
-      # - ADMIN_EMAIL=admin@example.com
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_SECURE=false
+      - SMTP_USER=test@example.com
+      - SMTP_PASS=testpassword
+      - ADMIN_EMAIL=admin@test.com
     depends_on:
-      db:
+      mongo:
         condition: service_healthy
     networks:
       - app-network
 
-  db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=dine_db
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
     volumes:
-      - postgres_data_local:/var/lib/postgresql/data
+      - mongo_data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d dine_db"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -36,7 +34,7 @@ services:
       - app-network
 
 volumes:
-  postgres_data_local:
+  mongo_data:
 
 networks:
   app-network:
