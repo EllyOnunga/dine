@@ -1,10 +1,40 @@
 import type { Express } from "express";
 import { type Server } from "http";
+import { requireAuth, getAuth } from "@clerk/express";
 import { storage } from "./storage";
 import { insertReservationSchema, insertNewsletterSchema, insertBlogSchema, insertEnquirySchema, insertMenuItemSchema, insertOrderSchema } from "@shared/schema";
 import { ZodError } from "zod";
 import { sendReservationConfirmation, sendReservationNotificationToAdmin, sendEnquiryNotification, sendEnquiryConfirmation, sendNewsletterWelcome, sendOrderStatusUpdate, sendOrderCustomMessage, sendOrderDetailsEmail, sendOrderNotificationToAdmin } from "./email";
 import { logger } from "./logger";
+
+async function syncAndGetLocalUser(req: any) {
+  const { userId: clerkId, sessionClaims } = getAuth(req);
+  if (!clerkId || typeof clerkId !== 'string' || !clerkId.trim()) {
+    return null;
+  }
+
+  let user = await storage.getUser(clerkId);
+  const userEmail = sessionClaims?.email as string;
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminCount = await storage.countAdmins();
+  const shouldBeAdmin = !!(adminCount === 0 || (userEmail && adminEmail && userEmail === adminEmail));
+
+  if (!user) {
+    user = await storage.createUser({
+      id: clerkId,
+      username: (sessionClaims?.username as string) || (sessionClaims?.name as string) || clerkId,
+      isAdmin: shouldBeAdmin,
+      loyaltyPoints: 0
+    });
+    logger.info({ userId: clerkId, isAdmin: user.isAdmin }, "New user synced from Clerk");
+  } else if (shouldBeAdmin && !user.isAdmin) {
+    user = await storage.setAdminStatus(clerkId, true) || user;
+    user.isAdmin = true;
+    logger.info({ userId: clerkId }, "User auto-promoted to admin");
+  }
+
+  return user;
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -161,15 +191,45 @@ export async function registerRoutes(
     }
   });
 
-  // Admin API Protection
-  app.use("/api/admin", (req, res, next) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Unauthorized");
+  // User Sync and Admin Protection middleware
+  app.use("/api/admin", requireAuth(), async (req: any, res, next) => {
+    try {
+      const user = await syncAndGetLocalUser(req);
+      
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized: Invalid or missing Clerk ID" });
+      }
+
+      if (!user.isAdmin) {
+        return res.status(403).send("Forbidden: Admins only");
+      }
+      
+      // Attach local user object to request
+      req.user = user;
+      next();
+    } catch (e) {
+      logger.error({ err: e }, "Error in admin middleware");
+      return res.status(500).send("Internal Server Error checking privileges");
     }
-    if (!(req.user as any).isAdmin) {
-      return res.status(403).send("Forbidden: Admins only");
+  });
+
+  // Get current user profile
+  app.get("/api/user/me", requireAuth(), async (req: any, res) => {
+    try {
+      const user = await syncAndGetLocalUser(req);
+      
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized: Invalid or missing Clerk ID" });
+      }
+      
+      res.json(user);
+    } catch (err) {
+      logger.error({ err, userId: req.auth?.userId }, "Failed to fetch user profile");
+      res.status(500).json({ 
+        message: "Failed to fetch user profile",
+        error: err instanceof Error ? err.message : String(err)
+      });
     }
-    next();
   });
 
   app.get("/api/admin/analytics", async (_req, res) => {
@@ -280,7 +340,7 @@ export async function registerRoutes(
             deliveryAddress: fullOrder.deliveryAddress,
             totalAmount: fullOrder.totalAmount,
             paymentMethod: fullOrder.paymentMethod,
-            createdAt: fullOrder.createdAt,
+            createdAt: fullOrder.createdAt || new Date(),
             status: "confirmed",
             items: fullOrder.items
           }).catch(err => logger.error({ err, orderId: fullOrder._id.toString() }, 'Failed to send order confirmation email'));
@@ -355,7 +415,7 @@ export async function registerRoutes(
           deliveryAddress: fullOrder.deliveryAddress,
           totalAmount: fullOrder.totalAmount,
           paymentMethod: fullOrder.paymentMethod,
-          createdAt: fullOrder.createdAt,
+          createdAt: fullOrder.createdAt || new Date(),
           status: "received",
           items: fullOrder.items
         };

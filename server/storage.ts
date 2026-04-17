@@ -1,44 +1,18 @@
-import { ObjectId, Collection, UpdateResult, Document } from "mongodb";
-import { getDb } from "./db";
-import {
-  User,
-  MenuItem,
-  Reservation,
-  NewsletterLead,
-  Blog,
-  Enquiry,
-  Suite,
-  Order,
-  OrderItem,
-  SiteSetting,
-  InsertUser,
-  InsertMenuItem,
-  InsertReservation,
-  InsertNewsletter,
-  InsertBlog,
-  InsertEnquiry,
-  InsertSuite,
-  InsertOrder,
-} from "@shared/schema";
-import session from "express-session";
-import MongoStore from "connect-mongo";
+// server/storage.ts
+import { db, pool, connectToDatabase } from "./db";
+import { eq, desc } from "drizzle-orm";
+import * as schema from "@shared/schema";
 
-const COLLECTIONS = {
-  USERS: "users",
-  MENU_ITEMS: "menu_items",
-  RESERVATIONS: "reservations",
-  NEWSLETTER_LEADS: "newsletter_leads",
-  BLOGS: "blogs",
-  ENQUIRIES: "enquiries",
-  SUITES: "suites",
-  ORDERS: "orders",
-  ORDER_ITEMS: "order_items",
-  SITE_SETTINGS: "site_settings",
-  SESSIONS: "sessions",
-} as const;
+// Utility to attach _id to Postgres rows for frontend compat
+function mapId<T>(record: T): T & { _id: string } {
+  return { ...record, _id: String((record as any).id) };
+}
+
+function mapIds<T>(records: T[]): (T & { _id: string })[] {
+  return records.map(mapId);
+}
 
 export class Storage {
-  private _sessionStore: session.Store | null = null;
   private _dbReady: Promise<void> | null = null;
 
   constructor() {
@@ -49,350 +23,251 @@ export class Storage {
     await this._dbReady;
   }
 
-  get sessionStore(): session.Store {
-    if (!this._sessionStore) {
-      this._sessionStore = MongoStore.create({
-        clientPromise: Promise.resolve(getDb().client),
-        collectionName: COLLECTIONS.SESSIONS,
-        ttl: 7 * 24 * 60 * 60,
-      });
-    }
-    return this._sessionStore;
+  async getUser(id: string): Promise<schema.User | null> {
+    const res = await db.select().from(schema.users).where(eq(schema.users.id, id));
+    return res.length ? mapId(res[0]) as schema.User : null;
   }
 
-  private collection<T extends Document>(name: string): Collection<T> {
-    return getDb().collection<T>(name);
+  async getUserByUsername(username: string): Promise<schema.User | null> {
+    const res = await db.select().from(schema.users).where(eq(schema.users.username, username));
+    return res.length ? mapId(res[0]) as schema.User : null;
   }
 
-  private users(): Collection<User> {
-    return this.collection<User>(COLLECTIONS.USERS);
+  async createUser(user: schema.InsertUser): Promise<schema.User> {
+    const res = await db.insert(schema.users).values(user).returning();
+    return mapId(res[0]) as schema.User;
+  }
+  
+  async countAdmins(): Promise<number> {
+    const res = await db.select().from(schema.users).where(eq(schema.users.isAdmin, true));
+    return res.length;
   }
 
-  private menuItems(): Collection<MenuItem> {
-    return this.collection<MenuItem>(COLLECTIONS.MENU_ITEMS);
+  async getMenuItems(): Promise<schema.MenuItem[]> {
+    const res = await db.select().from(schema.menuItems);
+    return mapIds(res) as schema.MenuItem[];
   }
 
-  private reservations(): Collection<Reservation> {
-    return this.collection<Reservation>(COLLECTIONS.RESERVATIONS);
+  async getMenuItem(id: string): Promise<schema.MenuItem | null> {
+    const res = await db.select().from(schema.menuItems).where(eq(schema.menuItems.id, id));
+    return res.length ? mapId(res[0]) as schema.MenuItem : null;
   }
 
-  private newsletterLeads(): Collection<NewsletterLead> {
-    return this.collection<NewsletterLead>(COLLECTIONS.NEWSLETTER_LEADS);
+  async createMenuItem(item: schema.InsertMenuItem): Promise<schema.MenuItem> {
+    const res = await db.insert(schema.menuItems).values(item).returning();
+    return mapId(res[0]) as schema.MenuItem;
   }
 
-  private blogs(): Collection<Blog> {
-    return this.collection<Blog>(COLLECTIONS.BLOGS);
-  }
-
-  private enquiries(): Collection<Enquiry> {
-    return this.collection<Enquiry>(COLLECTIONS.ENQUIRIES);
-  }
-
-  private suites(): Collection<Suite> {
-    return this.collection<Suite>(COLLECTIONS.SUITES);
-  }
-
-  private orders(): Collection<Order> {
-    return this.collection<Order>(COLLECTIONS.ORDERS);
-  }
-
-  private orderItems(): Collection<OrderItem> {
-    return this.collection<OrderItem>(COLLECTIONS.ORDER_ITEMS);
-  }
-
-  private siteSettings(): Collection<SiteSetting> {
-    return this.collection<SiteSetting>(COLLECTIONS.SITE_SETTINGS);
-  }
-
-  async getUser(id: string): Promise<User | null> {
-    try {
-      const user = await this.users().findOne({ _id: new ObjectId(id) });
-      return user as User | null;
-    } catch {
-      return null;
-    }
-  }
-
-  async getUserByUsername(username: string): Promise<User | null> {
-    return this.users().findOne({ username }) as Promise<User | null>;
-  }
-
-  async createUser(user: InsertUser): Promise<User> {
-    const result = await this.users().insertOne({
-      ...user,
-      createdAt: new Date(),
-    });
-    return { ...user, _id: result.insertedId, createdAt: new Date() } as User;
-  }
-
-  async getMenuItems(): Promise<MenuItem[]> {
-    return this.menuItems().find({}).toArray() as Promise<MenuItem[]>;
-  }
-
-  async getMenuItem(id: string): Promise<MenuItem | null> {
-    try {
-      return await this.menuItems().findOne({ _id: new ObjectId(id) }) as MenuItem | null;
-    } catch {
-      return null;
-    }
-  }
-
-  async createMenuItem(item: InsertMenuItem): Promise<MenuItem> {
-    const result = await this.menuItems().insertOne({
-      ...item,
-      createdAt: new Date(),
-    });
-    return { ...item, _id: result.insertedId, createdAt: new Date() } as MenuItem;
-  }
-
-  async updateMenuItem(id: string, item: Partial<InsertMenuItem>): Promise<MenuItem | null> {
-    try {
-      const result = await this.menuItems().findOneAndUpdate(
-        { _id: new ObjectId(id) },
-        { $set: item },
-        { returnDocument: "after" }
-      );
-      return result as MenuItem | null;
-    } catch {
-      return null;
-    }
+  async updateMenuItem(id: string, item: Partial<schema.InsertMenuItem>): Promise<schema.MenuItem | null> {
+    const res = await db.update(schema.menuItems)
+      .set(item)
+      .where(eq(schema.menuItems.id, id))
+      .returning();
+    return res.length ? mapId(res[0]) as schema.MenuItem : null;
   }
 
   async deleteMenuItem(id: string): Promise<boolean> {
-    try {
-      const result = await this.menuItems().deleteOne({ _id: new ObjectId(id) });
-      return result.deletedCount === 1;
-    } catch {
-      return false;
-    }
+    const res = await db.delete(schema.menuItems).where(eq(schema.menuItems.id, id)).returning();
+    return res.length > 0;
   }
 
-  async seedMenuItems(items: InsertMenuItem[]): Promise<void> {
+  async seedMenuItems(items: schema.InsertMenuItem[]): Promise<void> {
     if (items.length === 0) return;
-    await this.menuItems().insertMany(items);
+    await db.insert(schema.menuItems).values(items);
   }
 
-  async createReservation(reservation: InsertReservation): Promise<Reservation> {
-    const result = await this.reservations().insertOne({
-      ...reservation,
-      createdAt: new Date(),
-    });
-    return { ...reservation, _id: result.insertedId, createdAt: new Date() } as Reservation;
+  async createReservation(reservation: schema.InsertReservation): Promise<schema.Reservation> {
+    const res = await db.insert(schema.reservations).values(reservation).returning();
+    return mapId(res[0]) as schema.Reservation;
   }
 
-  async getReservations(): Promise<Reservation[]> {
-    return this.reservations().find({}).toArray() as Promise<Reservation[]>;
+  async getReservations(): Promise<schema.Reservation[]> {
+    const res = await db.select().from(schema.reservations);
+    return mapIds(res) as schema.Reservation[];
   }
 
   async deleteReservation(id: string): Promise<boolean> {
+    const res = await db.delete(schema.reservations).where(eq(schema.reservations.id, id)).returning();
+    return res.length > 0;
+  }
+
+  async addNewsletterLead(email: string): Promise<schema.NewsletterLead> {
+    const res = await db.insert(schema.newsletterLeads).values({ email }).returning();
+    return mapId(res[0]) as schema.NewsletterLead;
+  }
+
+  async getNewsletterLeads(): Promise<schema.NewsletterLead[]> {
+    const res = await db.select().from(schema.newsletterLeads);
+    return mapIds(res) as schema.NewsletterLead[];
+  }
+
+  async getBlogs(): Promise<schema.Blog[]> {
+    const res = await db.select().from(schema.blogs).orderBy(desc(schema.blogs.createdAt));
+    return mapIds(res) as schema.Blog[];
+  }
+
+  async getBlog(id: string): Promise<schema.Blog | null> {
     try {
-      const result = await this.reservations().deleteOne({ _id: new ObjectId(id) });
-      return result.deletedCount === 1;
-    } catch {
-      return false;
-    }
-  }
-
-  async addNewsletterLead(email: string): Promise<NewsletterLead> {
-    const result = await this.newsletterLeads().insertOne({
-      email,
-      createdAt: new Date(),
-    });
-    return { email, _id: result.insertedId, createdAt: new Date() } as NewsletterLead;
-  }
-
-  async getNewsletterLeads(): Promise<NewsletterLead[]> {
-    return this.newsletterLeads().find({}).toArray() as Promise<NewsletterLead[]>;
-  }
-
-  async getBlogs(): Promise<Blog[]> {
-    return this.blogs().find({}).sort({ createdAt: -1 }).toArray() as Promise<Blog[]>;
-  }
-
-  async getBlog(id: string): Promise<Blog | null> {
-    try {
-      return await this.blogs().findOne({ _id: new ObjectId(id) }) as Blog | null;
+      const res = await db.select().from(schema.blogs).where(eq(schema.blogs.id, id));
+      return res.length ? mapId(res[0]) as schema.Blog : null;
     } catch {
       return null;
     }
   }
 
-  async createBlog(blog: InsertBlog): Promise<Blog> {
-    const result = await this.blogs().insertOne({
-      ...blog,
-      createdAt: new Date(),
-    });
-    return { ...blog, _id: result.insertedId, createdAt: new Date() } as Blog;
+  async createBlog(blog: schema.InsertBlog): Promise<schema.Blog> {
+    const res = await db.insert(schema.blogs).values(blog).returning();
+    return mapId(res[0]) as schema.Blog;
   }
 
-  async updateBlog(id: string, blog: Partial<InsertBlog>): Promise<Blog | null> {
-    try {
-      const result = await this.blogs().findOneAndUpdate(
-        { _id: new ObjectId(id) },
-        { $set: blog },
-        { returnDocument: "after" }
-      );
-      return result as Blog | null;
-    } catch {
-      return null;
-    }
+  async updateBlog(id: string, blog: Partial<schema.InsertBlog>): Promise<schema.Blog | null> {
+    const res = await db.update(schema.blogs).set(blog).where(eq(schema.blogs.id, id)).returning();
+    return res.length ? mapId(res[0]) as schema.Blog : null;
   }
 
   async deleteBlog(id: string): Promise<boolean> {
-    try {
-      const result = await this.blogs().deleteOne({ _id: new ObjectId(id) });
-      return result.deletedCount === 1;
-    } catch {
-      return false;
-    }
+    const res = await db.delete(schema.blogs).where(eq(schema.blogs.id, id)).returning();
+    return res.length > 0;
   }
 
-  async createEnquiry(enquiry: InsertEnquiry): Promise<Enquiry> {
-    const result = await this.enquiries().insertOne({
-      ...enquiry,
-      createdAt: new Date(),
-    });
-    return { ...enquiry, _id: result.insertedId, createdAt: new Date() } as Enquiry;
+  async createEnquiry(enquiry: schema.InsertEnquiry): Promise<schema.Enquiry> {
+    const res = await db.insert(schema.enquiries).values(enquiry).returning();
+    return mapId(res[0]) as schema.Enquiry;
   }
 
-  async getEnquiries(): Promise<Enquiry[]> {
-    return this.enquiries().find({}).toArray() as Promise<Enquiry[]>;
+  async getEnquiries(): Promise<schema.Enquiry[]> {
+    const res = await db.select().from(schema.enquiries);
+    return mapIds(res) as schema.Enquiry[];
   }
 
   async deleteEnquiry(id: string): Promise<boolean> {
-    try {
-      const result = await this.enquiries().deleteOne({ _id: new ObjectId(id) });
-      return result.deletedCount === 1;
-    } catch {
-      return false;
-    }
+    const res = await db.delete(schema.enquiries).where(eq(schema.enquiries.id, id)).returning();
+    return res.length > 0;
   }
 
-  async createOrder(order: InsertOrder): Promise<Order> {
+  async createOrder(order: schema.InsertOrder): Promise<schema.Order> {
     const { items, ...orderData } = order;
-    const result = await this.orders().insertOne({
-      ...orderData,
-      items: [],
-      createdAt: new Date(),
-    });
-
-    const orderId = result.insertedId.toString();
-
-    if (items && items.length > 0) {
-      const orderItemsWithId = items.map((item) => ({
-        ...item,
-        orderId,
-      }));
-      await this.orderItems().insertMany(orderItemsWithId);
-    }
-
-    return {
-      ...orderData,
-      _id: result.insertedId,
-      items,
-      createdAt: new Date(),
-    } as Order;
-  }
-
-  async getOrders(): Promise<Order[]> {
-    const orders = await this.orders().find({}).sort({ createdAt: -1 }).toArray();
     
-    for (const order of orders) {
-      const items = await this.orderItems().find({ orderId: order._id.toString() }).toArray();
-      (order as any).items = items;
-    }
-    
-    return orders as Order[];
-  }
-
-  async getOrder(id: string): Promise<Order | null> {
-    try {
-      const order = await this.orders().findOne({ _id: new ObjectId(id) }) as Order | null;
-      if (order) {
-        const items = await this.orderItems().find({ orderId: id }).toArray();
-        (order as any).items = items;
+    return await db.transaction(async (tx) => {
+      const orderRes = await tx.insert(schema.orders).values(orderData).returning();
+      const newOrder = orderRes[0];
+      
+      let insertedItems: schema.OrderItem[] = [];
+      if (items && items.length > 0) {
+        const itemsToInsert = items.map(i => ({
+          ...i,
+          orderId: newOrder.id,
+        }));
+        
+        const itemsRes = await tx.insert(schema.orderItems).values(itemsToInsert).returning();
+        insertedItems = mapIds(itemsRes) as schema.OrderItem[];
       }
-      return order;
-    } catch {
-      return null;
-    }
+      
+      const mappedOrder = mapId(newOrder) as any;
+      mappedOrder.items = insertedItems;
+      return mappedOrder as unknown as schema.Order;
+    });
   }
 
-  async updateOrder(id: string, status: string): Promise<Order | null> {
+  async getOrders(): Promise<schema.Order[]> {
+    const allOrders = await db.select().from(schema.orders).orderBy(desc(schema.orders.createdAt));
+    const allItems = await db.select().from(schema.orderItems);
+    
+    return allOrders.map(o => {
+      const mapped = mapId(o) as any;
+      mapped.items = mapIds(allItems.filter(i => i.orderId === o.id));
+      return mapped;
+    }) as schema.Order[];
+  }
+
+  async getOrder(id: string): Promise<schema.Order | null> {
     try {
-      const result = await this.orders().findOneAndUpdate(
-        { _id: new ObjectId(id) },
-        { $set: { status } },
-        { returnDocument: "after" }
-      );
-      return result as Order | null;
+      const res = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
+      if (!res.length) return null;
+      
+      const order = mapId(res[0]) as any;
+      const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, id));
+      order.items = mapIds(items);
+      return order as unknown as schema.Order;
     } catch {
       return null;
     }
   }
 
-  async getSiteSettings(): Promise<SiteSetting> {
-    let settings = await this.siteSettings().findOne({ id: "default" });
-    if (!settings) {
-      const result = await this.siteSettings().insertOne({
+  async updateOrder(id: string, status: string): Promise<schema.Order | null> {
+    try {
+      const res = await db.update(schema.orders).set({ status }).where(eq(schema.orders.id, id)).returning();
+      return res.length ? mapId(res[0]) as unknown as schema.Order : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async getSiteSettings(): Promise<schema.SiteSetting> {
+    let res = await db.select().from(schema.siteSettings).where(eq(schema.siteSettings.id, "default"));
+    if (!res.length) {
+      res = await db.insert(schema.siteSettings).values({
         id: "default",
         openingHours: "08:00-22:00",
         isOrderingEnabled: true,
         minOrderAmount: 0,
-      });
-      settings = {
-        _id: result.insertedId,
-        id: "default",
-        openingHours: "08:00-22:00",
-        isOrderingEnabled: true,
-        minOrderAmount: 0,
-      };
+      }).returning();
     }
-    return settings;
+    return mapId(res[0]) as schema.SiteSetting;
   }
 
-  async updateSiteSettings(settings: Partial<SiteSetting>): Promise<SiteSetting> {
-    const result = await this.siteSettings().findOneAndUpdate(
-      { id: "default" },
-      { $set: settings },
-      { returnDocument: "after", upsert: true }
-    );
-    return result as SiteSetting;
-  }
-
-  async updateUserPoints(userId: string, points: number): Promise<User | null> {
+  async updateSiteSettings(settings: Partial<schema.SiteSetting>): Promise<schema.SiteSetting> {
     try {
-      const result = await this.users().findOneAndUpdate(
-        { _id: new ObjectId(userId) },
-        { $set: { loyaltyPoints: points } },
-        { returnDocument: "after" }
-      );
-      return result as User | null;
+      const res = await db.insert(schema.siteSettings)
+        .values({ 
+          id: "default", 
+          openingHours: settings.openingHours || "08:00-22:00",
+          isOrderingEnabled: settings.isOrderingEnabled ?? true,
+          minOrderAmount: settings.minOrderAmount ?? 0,
+        })
+        .onConflictDoUpdate({
+          target: schema.siteSettings.id,
+          set: settings,
+        }).returning();
+      return mapId(res[0]) as schema.SiteSetting;
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
+  }
+
+  async updateUserPoints(userId: string, points: number): Promise<schema.User | null> {
+    const res = await db.update(schema.users).set({ loyaltyPoints: points }).where(eq(schema.users.id, userId)).returning();
+    return res.length ? mapId(res[0]) as schema.User : null;
+  }
+
+  async setAdminStatus(userId: string, isAdmin: boolean): Promise<schema.User | null> {
+    const res = await db.update(schema.users).set({ isAdmin }).where(eq(schema.users.id, userId)).returning();
+    return res.length ? mapId(res[0]) as schema.User : null;
+  }
+
+  async getSuites(): Promise<schema.Suite[]> {
+    const res = await db.select().from(schema.suites);
+    return mapIds(res) as schema.Suite[];
+  }
+
+  async getSuite(id: string): Promise<schema.Suite | null> {
+    try {
+      const res = await db.select().from(schema.suites).where(eq(schema.suites.id, id));
+      return res.length ? mapId(res[0]) as schema.Suite : null;
     } catch {
       return null;
     }
   }
 
-  async getSuites(): Promise<Suite[]> {
-    return this.suites().find({}).toArray() as Promise<Suite[]>;
-  }
-
-  async getSuite(id: string): Promise<Suite | null> {
-    try {
-      return await this.suites().findOne({ _id: new ObjectId(id) }) as Suite | null;
-    } catch {
-      return null;
-    }
-  }
-
-  async seedSuites(suites: InsertSuite[]): Promise<void> {
+  async seedSuites(suites: schema.InsertSuite[]): Promise<void> {
     if (suites.length === 0) return;
-    await this.suites().insertMany(suites);
+    await db.insert(schema.suites).values(suites);
   }
 
   async healthCheck(): Promise<boolean> {
     try {
-      await getDb().admin().ping();
+      await pool.query('SELECT 1');
       return true;
     } catch {
       return false;

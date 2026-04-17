@@ -1,31 +1,33 @@
-import { MongoClient, Db } from "mongodb";
+import { drizzle } from 'drizzle-orm/node-postgres';
+import pg from 'pg';
+import * as schema from '@shared/schema';
 
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/dine_db";
+// Required for production/build where 'pg' might be loaded slightly differently
+const { Pool } = pg;
 
-export const client = new MongoClient(uri, {
-  serverSelectionTimeoutMS: 30000,
-  connectTimeoutMS: 30000,
-});
-
-let db: Db;
-
-export async function connectToDatabase(): Promise<Db> {
-  if (!db) {
-    await client.connect();
-    db = client.db();
-    console.log(`Connected to MongoDB: ${db.databaseName}`);
-  }
-  return db;
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/dine_db";
+  // throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
 }
 
-export function getDb(): Db {
-  if (!db) {
-    throw new Error("Database not initialized. Call connectToDatabase() first.");
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const db = drizzle(pool, { schema });
+
+export async function connectToDatabase(): Promise<void> {
+  try {
+    const client = await pool.connect();
+    client.release();
+    console.log(`Connected to PostgreSQL`);
+  } catch (error) {
+    console.error("Failed to connect to PostgreSQL:", error);
+    // Don't throw immediately, let it retry or fail on queries
   }
+}
+
+export function getDb() {
   return db;
 }
 
 export async function closeDatabase(): Promise<void> {
-  await client.close();
-  db = undefined as unknown as Db;
+  await pool.end();
 }

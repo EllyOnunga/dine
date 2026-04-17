@@ -4,12 +4,25 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupMiddleware } from "./middleware";
-import { setupAuth } from "./auth";
+import { clerkMiddleware } from "@clerk/express";
 import { logger, httpLogger } from "./logger";
 import { connectToDatabase, closeDatabase } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Initialize Clerk first
+const clerkPK = process.env.CLERK_PUBLISHABLE_KEY || "";
+const clerkSK = process.env.CLERK_SECRET_KEY || "";
+
+if (!clerkPK || !clerkSK) {
+  logger.warn("Clerk keys are missing from environment variables. Authentication may fail.");
+}
+
+app.use(clerkMiddleware({
+  publishableKey: clerkPK,
+  secretKey: clerkSK,
+}));
 
 declare module "http" {
   interface IncomingMessage {
@@ -33,8 +46,6 @@ app.use(express.urlencoded({ extended: false }));
     logger.error({ err }, "Failed to connect to database");
     process.exit(1);
   }
-
-  setupAuth(app);
 
   await registerRoutes(httpServer, app);
 
@@ -69,7 +80,6 @@ app.use(express.urlencoded({ extended: false }));
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
     },
     () => {
       logger.info(`serving on port ${port}`);

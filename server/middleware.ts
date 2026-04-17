@@ -8,18 +8,18 @@ export function setupMiddleware(app: Express) {
     // Security headers
     app.use(
         helmet({
-            contentSecurityPolicy: {
+            contentSecurityPolicy: process.env.NODE_ENV === "production" ? {
                 directives: {
                     defaultSrc: ["'self'"],
-                    scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "blob:"],
+                    scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "blob:", "https://*.clerk.accounts.dev", "https://clerk.com", "https://*.clerk.com"],
                     workerSrc: ["'self'", "blob:"],
                     styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
                     fontSrc: ["'self'", "https://fonts.gstatic.com"],
-                    imgSrc: ["'self'", "data:", "https:", "blob:"],
-                    frameSrc: ["'self'", "https://www.google.com"],
-                    connectSrc: ["'self'", "ws:", "wss:", "*"],
+                    imgSrc: ["'self'", "data:", "https:", "blob:", "https://img.clerk.com", "https://*.clerk.com"],
+                    frameSrc: ["'self'", "https://www.google.com", "https://*.clerk.accounts.dev"],
+                    connectSrc: ["'self'", "ws:", "wss:", "*", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
                 },
-            },
+            } : false,
             crossOriginEmbedderPolicy: false,
         })
     );

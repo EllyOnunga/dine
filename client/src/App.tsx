@@ -22,7 +22,7 @@ import { Navbar } from "./components/ui/navbar";
 import { Footer } from "./components/ui/footer";
 import { ScrollToTop } from "./components/ui/scroll-to-top";
 import { WhatsAppButton } from "./components/ui/whatsapp-button";
-import { AuthProvider } from "@/hooks/use-auth";
+import { ClerkProvider } from "@clerk/clerk-react";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { CartProvider } from "@/hooks/cart-context";
 import AuthPage from "./pages/auth";
@@ -36,7 +36,7 @@ function Router() {
       <ScrollToTop />
       <Navbar />
       <Switch>
-        <ProtectedRoute path="/admin" component={AdminDashboard} />
+        <ProtectedRoute path="/admin" component={AdminDashboard} adminOnly={true} />
         <Route path="/auth" component={AuthPage} />
         <Route path="/cart" component={CartPage} />
         <Route path="/track-order" component={TrackOrderPage} />
@@ -61,20 +61,25 @@ function Router() {
   );
 }
 
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+if (!PUBLISHABLE_KEY) {
+  throw new Error("Missing Publishable Key. Please set VITE_CLERK_PUBLISHABLE_KEY in your environment variables.");
+}
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light" storageKey="savor-theme">
-        <AuthProvider>
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY} signInUrl="/auth" signUpUrl="/auth" afterSignInUrl="/admin">
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider defaultTheme="light" storageKey="savor-theme">
           <CartProvider>
             <TooltipProvider>
               <Toaster />
               <Router />
             </TooltipProvider>
           </CartProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
   );
 }
 

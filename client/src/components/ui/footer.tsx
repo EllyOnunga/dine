@@ -4,23 +4,20 @@ import {
     Phone,
     MapPin,
     Mail,
-    Instagram,
-    Facebook,
-    Youtube,
     MessageCircle,
-    Twitter,
     Music2
 } from "lucide-react";
+import { FaInstagram, FaFacebook, FaYoutube, FaTwitter } from "react-icons/fa";
 import { motion } from "framer-motion";
 
 export function Footer() {
     const socialLinks = [
-        { icon: <Instagram className="w-5 h-5" />, href: "#", label: "Instagram" },
-        { icon: <Facebook className="w-5 h-5" />, href: "#", label: "Facebook" },
+        { icon: <FaInstagram className="w-5 h-5" />, href: "#", label: "Instagram" },
+        { icon: <FaFacebook className="w-5 h-5" />, href: "#", label: "Facebook" },
         { icon: <Music2 className="w-5 h-5" />, href: "#", label: "TikTok" },
-        { icon: <Youtube className="w-5 h-5" />, href: "#", label: "YouTube" },
+        { icon: <FaYoutube className="w-5 h-5" />, href: "#", label: "YouTube" },
         { icon: <MessageCircle className="w-5 h-5" />, href: "#", label: "WhatsApp" },
-        { icon: <Twitter className="w-5 h-5" />, href: "#", label: "X (Twitter)" },
+        { icon: <FaTwitter className="w-5 h-5" />, href: "#", label: "X (Twitter)" },
     ];
 
     return (

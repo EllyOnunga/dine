@@ -1,32 +1,40 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
-      - MONGODB_URI=mongodb://mongo:27017/dine_db
-      - SESSION_SECRET=dev_secret_key_change_in_production
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/dine_db
       - NODE_ENV=production
-      - SMTP_HOST=smtp.gmail.com
-      - SMTP_PORT=587
-      - SMTP_SECURE=false
-      - SMTP_USER=test@example.com
-      - SMTP_PASS=testpassword
-      - ADMIN_EMAIL=admin@test.com
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
     depends_on:
-      mongo:
+      db:
         condition: service_healthy
     networks:
       - app-network
 
-  mongo:
-    image: mongo:7
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=dine_db
     ports:
-      - "27017:27017"
+      - "5432:5432"
     volumes:
-      - mongo_data:/data/db
+      - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dine_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -34,7 +42,7 @@ services:
       - app-network
 
 volumes:
-  mongo_data:
+  pg_data:
 
 networks:
   app-network:

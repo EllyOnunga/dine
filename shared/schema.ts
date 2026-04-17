@@ -1,9 +1,109 @@
-import { ObjectId } from "mongodb";
 import { z } from "zod";
+import { pgTable, text, timestamp, boolean, integer, json, real, uuid } from "drizzle-orm/pg-core";
+
+// Define Drizzle Tables
+export const users = pgTable("users", {
+  id: text("id").primaryKey(),
+  username: text("username").notNull(),
+  isAdmin: boolean("is_admin").default(false).notNull(),
+  loyaltyPoints: integer("loyalty_points").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const menuItems = pgTable("menu_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  price: text("price").notNull(),
+  originalPrice: text("original_price"),
+  description: text("description").notNull(),
+  category: text("category").notNull(),
+  tag: text("tag"),
+  image: text("image").notNull(),
+  isAvailable: boolean("is_available").default(true).notNull(),
+  isFeatured: boolean("is_featured").default(false).notNull(),
+  rating: integer("rating").default(5).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const reservations = pgTable("reservations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  date: text("date").notNull(),
+  time: text("time").notNull(),
+  guests: integer("guests").notNull(),
+  requests: text("requests"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const newsletterLeads = pgTable("newsletter_leads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const blogs = pgTable("blogs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  author: text("author").notNull(),
+  image: text("image").notNull(),
+  category: text("category").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const enquiries = pgTable("enquiries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const suites = pgTable("suites", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  pricePerNight: integer("price_per_night").notNull(),
+  image: text("image").notNull(),
+  amenities: json("amenities").$type<string[]>().default([]).notNull(),
+  isAvailable: boolean("is_available").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const orders = pgTable("orders", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  deliveryAddress: text("delivery_address").notNull(),
+  totalAmount: integer("total_amount").notNull(),
+  paymentMethod: text("payment_method").default("cash").notNull(),
+  paymentStatus: text("payment_status").default("pending").notNull(),
+  status: text("status").default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const orderItems = pgTable("order_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  menuItemId: text("menu_item_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  price: real("price").notNull(),
+  itemName: text("item_name").notNull(),
+});
+
+export const siteSettings = pgTable("site_settings", {
+  id: text("id").primaryKey(), 
+  openingHours: text("opening_hours").notNull(),
+  isOrderingEnabled: boolean("is_ordering_enabled").notNull(),
+  minOrderAmount: integer("min_order_amount").notNull(),
+});
 
 export const insertUserSchema = z.object({
+  id: z.string(),
   username: z.string().min(1).max(100),
-  password: z.string().min(6),
   isAdmin: z.boolean().default(false),
   loyaltyPoints: z.number().int().min(0).default(0),
 });
@@ -85,43 +185,51 @@ export type InsertSuite = z.infer<typeof insertSuiteSchema>;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 
 export interface User extends InsertUser {
-  _id: ObjectId;
-  createdAt?: Date;
+  id: string;
+  _id: string;
+  createdAt?: Date | null;
 }
 
 export interface MenuItem extends InsertMenuItem {
-  _id: ObjectId;
-  createdAt?: Date;
+  id: string;
+  _id: string;
+  createdAt?: Date | null;
 }
 
 export interface Reservation extends Omit<InsertReservation, "guests"> {
-  _id: ObjectId;
+  id: string;
+  _id: string;
   guests: number;
-  createdAt: Date;
+  createdAt: Date | null;
 }
 
 export interface NewsletterLead extends InsertNewsletter {
-  _id: ObjectId;
-  createdAt: Date;
+  id: string;
+  _id: string;
+  createdAt: Date | null;
 }
 
 export interface Blog extends InsertBlog {
-  _id: ObjectId;
-  createdAt: Date;
+  id: string;
+  _id: string;
+  createdAt: Date | null;
 }
 
 export interface Enquiry extends InsertEnquiry {
-  _id: ObjectId;
-  createdAt: Date;
+  id: string;
+  _id: string;
+  createdAt: Date | null;
 }
 
 export interface Suite extends InsertSuite {
-  _id: ObjectId;
-  createdAt?: Date;
+  id: string;
+  _id: string;
+  createdAt?: Date | null;
 }
 
 export interface OrderItem {
-  _id?: ObjectId;
+  id: string;
+  _id?: string;
   orderId: string;
   menuItemId: string;
   quantity: number;
@@ -130,13 +238,14 @@ export interface OrderItem {
 }
 
 export interface Order extends Omit<InsertOrder, "items"> {
-  _id: ObjectId;
+  id: string;
+  _id: string;
   items: OrderItem[];
-  createdAt: Date;
+  createdAt: Date | null;
 }
 
 export interface SiteSetting {
-  _id?: ObjectId;
+  _id?: string;
   id: string;
   openingHours: string;
   isOrderingEnabled: boolean;

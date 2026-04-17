@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, Phone, Mail, Instagram, Facebook } from "lucide-react";
+import { MapPin, Phone, Mail } from "lucide-react";
+import { FaInstagram, FaFacebook } from "react-icons/fa";
 
 export default function Contact() {
   return (
@@ -79,8 +80,8 @@ export default function Contact() {
                 <div className="pt-8 border-t border-border">
                   <h3 className="text-xl font-serif font-bold mb-4">Follow Our Story</h3>
                   <div className="flex gap-4">
-                    <Button variant="outline" size="icon" className="rounded-full"><Instagram className="w-5 h-5" /></Button>
-                    <Button variant="outline" size="icon" className="rounded-full"><Facebook className="w-5 h-5" /></Button>
+                    <Button variant="outline" size="icon" className="rounded-full"><FaInstagram className="w-5 h-5" /></Button>
+                    <Button variant="outline" size="icon" className="rounded-full"><FaFacebook className="w-5 h-5" /></Button>
                   </div>
                 </div>
               </motion.div>

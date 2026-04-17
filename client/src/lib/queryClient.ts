@@ -11,10 +11,16 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  token?: string | null,
 ): Promise<Response> {
+  const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -29,7 +35,16 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = queryKey[0] as string;
+    const token = queryKey[1] as string | undefined;
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(url, {
+      headers,
       credentials: "include",
     });
 

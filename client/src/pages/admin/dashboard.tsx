@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
+import { useClerk } from "@clerk/clerk-react";
 import { MenuItem, Reservation, Enquiry, Blog, NewsletterLead, Order, OrderItem, SiteSetting } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -52,7 +52,7 @@ interface Analytics {
 }
 
 export default function AdminDashboard() {
-    const { logoutMutation } = useAuth();
+    const { signOut } = useClerk();
     const { toast } = useToast();
     const [activeTab, setActiveTab] = useState("reservations");
 
@@ -226,10 +226,8 @@ export default function AdminDashboard() {
                     <Button variant="outline" onClick={() => window.location.href = "/"}>View Site</Button>
                     <Button
                         className="bg-primary hover:bg-primary/90"
-                        onClick={() => logoutMutation.mutate()}
-                        disabled={logoutMutation.isPending}
+                        onClick={() => signOut({ redirectUrl: '/' })}
                     >
-                        {logoutMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Sign Out
                     </Button>
                 </div>
