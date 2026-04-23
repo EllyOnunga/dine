@@ -177,10 +177,13 @@ export default function UserDashboard() {
                                             {orders.slice(0, 5).map((order) => (
                                                 <div key={order.id} className="p-6 hover:bg-muted/10 transition-colors flex flex-col md:flex-row justify-between gap-4">
                                                     <div className="space-y-1">
-                                                        <div className="flex items-center gap-3">
+                                                        <div className="flex flex-wrap items-center gap-2">
                                                             <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">#{order.id.slice(-6).toUpperCase()}</span>
                                                             <Badge variant="outline" className={`text-[10px] capitalize ${getStatusColor(order.status)} underline-none`}>
                                                                 {order.status.replace('_', ' ')}
+                                                            </Badge>
+                                                            <Badge variant="outline" className={`text-[10px] capitalize ${order.paymentStatus === 'completed' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-orange-500/10 text-orange-500 border-orange-500/20'}`}>
+                                                                {order.paymentStatus === 'completed' ? 'Paid' : 'Payment: Pending'}
                                                             </Badge>
                                                         </div>
                                                         <div className="font-bold">

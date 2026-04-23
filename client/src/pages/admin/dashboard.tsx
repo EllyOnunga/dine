@@ -160,6 +160,7 @@ export default function AdminDashboard() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/user/orders"] });
             toast({ title: "Order status updated and notification sent" });
         },
         onError: (err: Error) => {
@@ -173,6 +174,7 @@ export default function AdminDashboard() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/user/orders"] });
             toast({ title: "Payment status updated" });
         },
         onError: (err: Error) => {
