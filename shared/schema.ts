@@ -96,9 +96,49 @@ export const orderItems = pgTable("order_items", {
 
 export const siteSettings = pgTable("site_settings", {
   id: text("id").primaryKey(), 
-  openingHours: text("opening_hours").notNull(),
-  isOrderingEnabled: boolean("is_ordering_enabled").notNull(),
-  minOrderAmount: integer("min_order_amount").notNull(),
+  restaurantName: text("restaurant_name").notNull().default("Savannah & Spice"),
+  restaurantTagline: text("restaurant_tagline").notNull().default("The Pinnacle of Kenyan Culinary Art"),
+  address: text("address").notNull().default("Karen Triangle Mall, Nairobi"),
+  phone: text("phone").notNull().default("+254 712 345 678"),
+  email: text("email").notNull().default("hello@savannahspice.co.ke"),
+  openingHours: text("opening_hours").notNull().default("11am - 11pm (Mon-Sun)"),
+  isOrderingEnabled: boolean("is_ordering_enabled").notNull().default(true),
+  minOrderAmount: integer("min_order_amount").notNull().default(1000),
+  mpesaPaybill: text("mpesa_paybill"),
+  mpesaTill: text("mpesa_till"),
+  cloudinaryCloudName: text("cloudinary_cloud_name"),
+  cloudinaryApiKey: text("cloudinary_api_key"),
+  instagramAccessToken: text("instagram_access_token"),
+  instagramTokenExpiry: timestamp("instagram_token_expiry"),
+  instagramHandle: text("instagram_handle").notNull().default("savannah_spice_ke"),
+});
+
+export const siteContent = pgTable("site_content", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  section: text("section").notNull(), // e.g., 'hero', 'about', 'story'
+  key: text("key").notNull(),         // e.g., 'title', 'bullet_point'
+  value: text("value").notNull(),
+  type: text("type").notNull(),       // 'text', 'image', 'list_item'
+  order: integer("order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const testimonials = pgTable("testimonials", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  platform: text("platform").notNull(), // e.g., 'Google Reviews'
+  text: text("text").notNull(),
+  rating: integer("rating").default(5).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const faqs = pgTable("faqs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  icon: text("icon"), // lucide icon name
+  order: integer("order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const insertUserSchema = z.object({
@@ -247,7 +287,47 @@ export interface Order extends Omit<InsertOrder, "items"> {
 export interface SiteSetting {
   _id?: string;
   id: string;
+  restaurantName: string;
+  restaurantTagline: string;
+  address: string;
+  phone: string;
+  email: string;
   openingHours: string;
   isOrderingEnabled: boolean;
   minOrderAmount: number;
+  mpesaPaybill?: string | null;
+  mpesaTill?: string | null;
+  cloudinaryCloudName?: string | null;
+  cloudinaryApiKey?: string | null;
+  instagramAccessToken?: string | null;
+  instagramTokenExpiry?: Date | null;
+  instagramHandle: string;
+}
+
+export interface SiteContent {
+  id: string;
+  section: string;
+  key: string;
+  value: string;
+  type: string;
+  order: number;
+  createdAt: Date;
+}
+
+export interface Testimonial {
+  id: string;
+  name: string;
+  platform: string;
+  text: string;
+  rating: number;
+  createdAt: Date;
+}
+
+export interface FAQ {
+  id: string;
+  question: string;
+  answer: string;
+  icon?: string | null;
+  order: number;
+  createdAt: Date;
 }

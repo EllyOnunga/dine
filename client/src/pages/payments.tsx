@@ -1,35 +1,45 @@
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { CheckCircle2, ShieldCheck, Smartphone, CreditCard, ChevronRight } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Smartphone, CreditCard, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import { useSiteSettings, useSiteContent } from "@/hooks/use-site-data";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function PaymentMethods() {
+    const { data: settings, isLoading: settingsLoading } = useSiteSettings();
+    const { data: mpesaContent, isLoading: mpesaLoading } = useSiteContent('payments_mpesa');
+    const { data: cardContent, isLoading: cardLoading } = useSiteContent('payments_cards');
+
+    if (settingsLoading || mpesaLoading || cardLoading) {
+        return (
+            <div className="pt-32 min-h-screen bg-background">
+                <div className="container mx-auto px-4">
+                    <Skeleton className="h-48 w-full mb-12" />
+                    <div className="grid md:grid-cols-2 gap-8">
+                        <Skeleton className="h-[600px] w-full rounded-2xl" />
+                        <Skeleton className="h-[600px] w-full rounded-2xl" />
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     const steps = [
         {
             title: "M-Pesa Payments",
             icon: <Smartphone className="w-8 h-8 text-primary" />,
-            image: "/images/mpesa-payment.png",
+            image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=800", // Dynamic eventually
             description: "Fast and secure mobile payments directly from your phone.",
-            howItWorks: [
-                "Select M-Pesa at checkout or mention it to our staff.",
-                "An STK push will be sent to your mobile phone.",
-                "Enter your M-Pesa PIN to authorize the transaction.",
-                "Receive instant confirmation on your phone and our system."
-            ],
-            details: "You can also use our Paybill 123456 or Buy Goods TILL 789012."
+            howItWorks: mpesaContent?.filter(c => c.key === 'step').map(c => c.value) || [],
+            details: `You can also use our Paybill ${settings?.mpesaPaybill || '123456'} or Buy Goods TILL ${settings?.mpesaTill || '789012'}.`
         },
         {
             title: "Credit & Debit Cards",
             icon: <CreditCard className="w-8 h-8 text-primary" />,
-            image: "/images/card-payment.png",
+            image: "https://images.unsplash.com/photo-1556740758-90eb79425181?q=80&w=800", // Dynamic eventually
             description: "We accept all major international and local cards.",
-            howItWorks: [
-                "Present your card at the point of sale.",
-                "Our secure terminals process the transaction in seconds.",
-                "We support Chip & PIN, Swipe, and Contactless (Tap) payments.",
-                "Transactions are encrypted and 100% secure."
-            ],
+            howItWorks: cardContent?.filter(c => c.key === 'step').map(c => c.value) || [],
             details: "Accepted cards: Visa, Mastercard, American Express, and more."
         }
     ];

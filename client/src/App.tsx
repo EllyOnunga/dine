@@ -17,6 +17,7 @@ import Menu from "./pages/menu";
 import Blog from "./pages/blog";
 import BlogDetail from "./pages/blog-detail";
 import PaymentMethods from "./pages/payments";
+import UserDashboard from "./pages/dashboard";
 import AdminDashboard from "./pages/admin/dashboard";
 import { Navbar } from "./components/ui/navbar";
 import { Footer } from "./components/ui/footer";
@@ -29,6 +30,7 @@ import AuthPage from "./pages/auth";
 import CartPage from "./pages/cart";
 import TrackOrderPage from "./pages/track-order";
 import SuitesPage from "./pages/suites";
+import EventsPage from "./pages/events";
 
 function Router() {
   return (
@@ -37,12 +39,14 @@ function Router() {
       <Navbar />
       <Switch>
         <ProtectedRoute path="/admin" component={AdminDashboard} adminOnly={true} />
+        <ProtectedRoute path="/dashboard" component={UserDashboard} />
         <Route path="/auth" component={AuthPage} />
         <Route path="/cart" component={CartPage} />
         <Route path="/track-order" component={TrackOrderPage} />
         <Route path="/" component={Home} />
         <Route path="/menu" component={Menu} />
         <Route path="/stay" component={SuitesPage} />
+        <Route path="/events" component={EventsPage} />
         <Route path="/blog" component={Blog} />
         <Route path="/blog/:id" component={BlogDetail} />
         <Route path="/payments" component={PaymentMethods} />
@@ -68,7 +72,7 @@ if (!PUBLISHABLE_KEY) {
 }
 function App() {
   return (
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY} signInUrl="/auth" signUpUrl="/auth" afterSignInUrl="/admin">
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY} signInUrl="/auth" signUpUrl="/auth" afterSignInUrl="/dashboard">
       <QueryClientProvider client={queryClient}>
         <ThemeProvider defaultTheme="light" storageKey="savor-theme">
           <CartProvider>

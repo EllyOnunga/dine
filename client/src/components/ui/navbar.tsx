@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { UtensilsCrossed, Menu as MenuIcon, X, Settings as SettingsIcon, ShoppingCart, Award } from "lucide-react";
+import { UtensilsCrossed, Menu as MenuIcon, X, Settings as SettingsIcon, ShoppingCart, Award, ShoppingBag } from "lucide-react";
 import { useCart } from "@/hooks/cart-context";
 import { Badge } from "@/components/ui/badge";
 import { UserButton, useUser, SignInButton } from "@clerk/clerk-react";
@@ -101,6 +101,11 @@ export function Navbar() {
                 <SettingsIcon className="h-5 w-5" />
               </Button>
             </Link>
+            <Link href="/dashboard">
+              <Button variant="ghost" size="icon" className={cn("rounded-full", navBackground ? "text-foreground/80" : "text-white/80 hover:text-white")}>
+                <ShoppingBag className="h-5 w-5" />
+              </Button>
+            </Link>
             <Link href="/reservations">
               <Button
                 variant={navBackground ? "default" : "secondary"}
@@ -129,6 +134,11 @@ export function Navbar() {
               <SettingsIcon className="h-5 w-5" />
             </Button>
           </Link>
+          <Link href="/dashboard">
+            <Button variant="ghost" size="icon" className={cn("rounded-full", navBackground ? "text-foreground/80" : "text-white/80")}>
+              <ShoppingBag className="h-5 w-5" />
+            </Button>
+          </Link>
           <button
             className="p-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -142,24 +152,48 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 w-full bg-background border-b border-border p-4 flex flex-col gap-4 shadow-xl animate-in slide-in-from-top duration-300">
+        <div className="md:hidden fixed inset-0 top-[72px] bg-background z-40 flex flex-col pt-8 pb-32 px-6 overflow-y-auto w-full h-[calc(100vh-72px)] animate-in slide-in-from-bottom-2 fade-in duration-300">
+          <div className="flex flex-col gap-6 w-full">
           {navLinks.map((item) => (
             <Link key={item.name} href={item.href}>
               <span
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-lg font-serif font-semibold border-b border-border/50 pb-2 cursor-pointer"
+                className="text-2xl font-serif font-bold text-foreground border-b border-border/20 pb-4 flex justify-between items-center cursor-pointer active:scale-95 transition-transform"
               >
                 {item.name}
               </span>
             </Link>
           ))}
-          <Link href="/reservations">
-            <Button className="w-full font-serif italic" onClick={() => setMobileMenuOpen(false)}>
-              Book a Table
-            </Button>
-          </Link>
+          </div>
+          <div className="mt-auto pt-8 flex flex-col gap-6 w-full">
+            {user && (
+              <div className="flex items-center justify-between p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                <div className="flex items-center gap-3">
+                  <UserButton afterSignOutUrl="/" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-foreground">{user.firstName || "Customer"}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground italic">Dine Elite Member</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-white shadow-lg shadow-primary/20">
+                  <Award className="h-3.5 w-3.5" />
+                  <span className="text-xs font-bold">{(user.publicMetadata?.loyaltyPoints as number) || 0} Points</span>
+                </div>
+              </div>
+            )}
+            {!user && (
+              <SignInButton mode="modal">
+                <Button variant="outline" size="lg" className="w-full h-14 text-lg font-serif">Sign In</Button>
+              </SignInButton>
+            )}
+            <Link href="/reservations">
+              <Button size="lg" className="w-full h-14 text-lg font-serif italic shadow-xl" onClick={() => setMobileMenuOpen(false)}>
+                Book a Table
+              </Button>
+            </Link>
+          </div>
         </div>
       )}
     </nav>

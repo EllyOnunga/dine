@@ -10,8 +10,26 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MapPin, Phone, Mail } from "lucide-react";
 import { FaInstagram, FaFacebook } from "react-icons/fa";
+import { useSiteSettings } from "@/hooks/use-site-data";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Contact() {
+  const { data: settings, isLoading } = useSiteSettings();
+
+  if (isLoading) {
+    return (
+      <div className="pt-24 min-h-screen bg-background">
+        <div className="container mx-auto px-4 max-w-6xl">
+          <Skeleton className="h-20 w-1/2 mx-auto mb-16" />
+          <div className="grid lg:grid-cols-2 gap-16">
+            <Skeleton className="h-[600px] w-full rounded-2xl" />
+            <Skeleton className="h-[600px] w-full rounded-2xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="pt-24 min-h-screen bg-background text-foreground">
       <section className="py-24">
@@ -20,12 +38,12 @@ export default function Contact() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-center mb-16"
+              className="text-center mb-12 sm:mb-16 px-4"
             >
-              <h1 className="text-5xl font-serif font-bold mb-4 text-primary">Contact Us</h1>
-              <p className="text-muted-foreground italic">Karibu Savannah & Spice – Visit us in the heart of Karen.</p>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold mb-4 text-primary px-2">Contact Us</h1>
+              <p className="text-muted-foreground italic text-sm sm:text-base px-4">Karibu {settings?.restaurantName} – Visit us in the heart of Karen.</p>
             </motion.div>
-
+ 
             <div className="grid lg:grid-cols-2 gap-16">
               <motion.div
                 initial={{ opacity: 0, x: -30 }}
@@ -41,7 +59,7 @@ export default function Contact() {
                     </div>
                     <div>
                       <h3 className="text-xl font-serif font-bold mb-2">Location</h3>
-                      <p className="text-muted-foreground">Karen Triangle Mall, 2nd Floor<br />Karen, Nairobi, Kenya</p>
+                      <p className="text-muted-foreground">{settings?.address}</p>
                     </div>
                   </div>
                   <div className="flex gap-4">
@@ -50,7 +68,7 @@ export default function Contact() {
                     </div>
                     <div>
                       <h3 className="text-xl font-serif font-bold mb-2">Phone</h3>
-                      <p className="text-muted-foreground">+254 712 345 678</p>
+                      <p className="text-muted-foreground">{settings?.phone}</p>
                     </div>
                   </div>
                   <div className="flex gap-4">
@@ -59,7 +77,7 @@ export default function Contact() {
                     </div>
                     <div>
                       <h3 className="text-xl font-serif font-bold mb-2">Email</h3>
-                      <p className="text-muted-foreground">hello@savannahspice.co.ke</p>
+                      <p className="text-muted-foreground">{settings?.email}</p>
                     </div>
                   </div>
                 </div>
@@ -91,7 +109,7 @@ export default function Contact() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8 }}
-                className="bg-muted/30 p-8 rounded-2xl h-fit"
+                className="bg-muted/30 p-5 sm:p-8 rounded-2xl h-fit mx-2 sm:mx-0 shadow-sm"
               >
                 <ContactForm />
               </motion.div>
@@ -188,7 +206,7 @@ function ContactForm() {
       <Button
         type="submit"
         disabled={enquiryMutation.isPending}
-        className="w-full h-12 font-serif italic bg-primary hover:bg-primary/90"
+        className="w-full h-14 font-serif italic bg-primary hover:bg-primary/90 text-lg shadow-xl mt-2"
       >
         {enquiryMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Send Message

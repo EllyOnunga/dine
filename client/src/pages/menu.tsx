@@ -7,7 +7,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/hooks/cart-context";
 import { Link } from "wouter";
-import { ChevronRight, Utensils } from "lucide-react";
+import { ChevronRight, Utensils, Minus, Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useState } from "react";
 
 export default function MenuPage() {
     const { addToCart } = useCart();
@@ -15,14 +17,24 @@ export default function MenuPage() {
         queryKey: ["/api/menu"],
     });
 
+    const [activeCategory, setActiveCategory] = useState<string>("All");
+    const [selectedQuantity, setSelectedQuantity] = useState<number>(1);
+    const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
     if (isLoading) {
         return (
             <div className="min-h-screen pt-24 bg-background">
                 <div className="container mx-auto px-4">
                     <Skeleton className="h-12 w-64 mb-8" />
+                    <div className="flex gap-4 mb-8">
+                        <Skeleton className="h-10 w-24 rounded-full" />
+                        <Skeleton className="h-10 w-24 rounded-full" />
+                        <Skeleton className="h-10 w-24 rounded-full" />
+                    </div>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
-                            <Skeleton key={i} className="h-80 rounded-xl" />
+                            <Skeleton key={i} className="h-48 rounded-xl" />
                         ))}
                     </div>
                 </div>
@@ -30,7 +42,31 @@ export default function MenuPage() {
         );
     }
 
-    const categories = Array.from(new Set(menuItems?.map((item) => item.category)));
+    const categories = ["All", ...Array.from(new Set(menuItems?.map((item) => item.category)))];
+
+    const filteredItems = menuItems?.filter(
+        (item) => activeCategory === "All" || item.category === activeCategory
+    ) || [];
+
+    const handleOpenModal = (item: MenuItem) => {
+        setSelectedItem(item);
+        setSelectedQuantity(1);
+        setIsModalOpen(true);
+    };
+
+    const handleAddToCart = () => {
+        if (selectedItem) {
+            for (let i = 0; i < selectedQuantity; i++) {
+                addToCart(selectedItem);
+            }
+            setIsModalOpen(false);
+        }
+    };
+
+    const calculateItemPrice = (priceStr: string) => {
+        const num = parseFloat(priceStr.replace(/[^0-9.]/g, ''));
+        return isNaN(num) ? 0 : num;
+    };
 
     return (
         <div className="min-h-screen bg-background">
@@ -54,80 +90,148 @@ export default function MenuPage() {
             {/* Menu Content */}
             <section className="py-20">
                 <div className="container mx-auto px-4">
-                    <div className="space-y-20 max-w-6xl mx-auto">
-                        {categories.map((category) => (
-                            <div key={category} className="space-y-10">
-                                <div className="flex items-center gap-6">
-                                    <div className="p-3 bg-primary/10 rounded-2xl text-primary">
-                                        <Utensils className="w-6 h-6" />
-                                    </div>
-                                    <h2 className="text-3xl md:text-4xl font-serif font-bold">{category}</h2>
-                                    <div className="h-[1px] flex-1 bg-border/50" />
-                                </div>
+                    <div className="max-w-6xl mx-auto">
+                        
+                        {/* Category Filters */}
+                        <div className="flex overflow-x-auto pb-4 mb-8 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap gap-3 sm:justify-center no-scrollbar">
+                            {categories.map((category) => (
+                                <Button
+                                    key={category}
+                                    variant={activeCategory === category ? "default" : "outline"}
+                                    className={`rounded-full px-6 font-serif whitespace-nowrap h-11 ${activeCategory === category ? 'shadow-md ring-2 ring-primary/20' : ''}`}
+                                    onClick={() => setActiveCategory(category)}
+                                >
+                                    {category}
+                                </Button>
+                            ))}
+                        </div>
 
-                                <div className="grid md:grid-cols-2 gap-8">
-                                    {menuItems
-                                        ?.filter((item) => item.category === category)
-                                        .map((item, index) => (
-                                            <motion.div
-                                                key={item.id}
-                                                initial={{ opacity: 0, x: index % 2 === 0 ? -20 : 20 }}
-                                                whileInView={{ opacity: 1, x: 0 }}
-                                                viewport={{ once: true }}
-                                            >
-                                                <Card className="group border-none bg-muted/30 hover:bg-muted/50 transition-all duration-300">
-                                                    <CardContent className="p-6 flex gap-6">
-                                                        <div className="relative w-32 h-32 flex-shrink-0 overflow-hidden rounded-xl">
-                                                            <img
-                                                                src={item.image}
-                                                                alt={item.name}
-                                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                                            />
-                                                        </div>
-                                                        <div className="flex-1 space-y-2">
-                                                            <div className="flex justify-between items-start">
-                                                                <h3 className="text-xl font-serif font-bold text-foreground group-hover:text-primary transition-colors">
-                                                                    {item.name}
-                                                                </h3>
-                                                                <div className="text-right">
-                                                                    {item.originalPrice && (
-                                                                        <span className="text-sm text-muted-foreground line-through block">
-                                                                            {item.originalPrice}
-                                                                        </span>
-                                                                    )}
-                                                                    <span className="text-lg font-serif font-bold text-primary">
-                                                                        {item.price}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            <p className="text-muted-foreground text-sm italic leading-relaxed">
-                                                                {item.description}
-                                                            </p>
-                                                            {item.tag && (
-                                                                <Badge variant="secondary" className="bg-primary/5 text-primary border-none">
-                                                                    {item.tag}
-                                                                </Badge>
-                                                            )}
-                                                            <div className="pt-2">
-                                                                <Button
-                                                                    size="sm"
-                                                                    className="w-full sm:w-auto gap-2"
-                                                                    onClick={() => addToCart(item)}
-                                                                >
-                                                                    <Utensils className="h-4 w-4" /> Add to Cart
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
-                                            </motion.div>
-                                        ))}
-                                </div>
+                        {/* Items Grid */}
+                        <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-6">
+                            {filteredItems.map((item, index) => (
+                                <motion.div
+                                    key={item.id}
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                                    onClick={() => handleOpenModal(item)}
+                                >
+                                    <Card className="group cursor-pointer border-none shadow-sm hover:shadow-xl bg-card hover:bg-muted/30 transition-all duration-300">
+                                        <CardContent className="p-3 sm:p-4 flex gap-4 h-full">
+                                            <div className="w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0 overflow-hidden rounded-lg">
+                                                <img
+                                                    src={item.image}
+                                                    alt={item.name}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                />
+                                            </div>
+                                            <div className="flex-1 flex flex-col min-w-0">
+                                                <div className="flex justify-between items-start mb-1 gap-2">
+                                                    <h3 className="text-base sm:text-lg font-serif font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                                                        {item.name}
+                                                    </h3>
+                                                    <span className="font-serif font-bold text-primary whitespace-nowrap">
+                                                        {item.price}
+                                                    </span>
+                                                </div>
+                                                <p className="text-muted-foreground text-xs sm:text-sm italic leading-snug line-clamp-2 mb-2 flex-grow">
+                                                    {item.description}
+                                                </p>
+                                                <div className="flex justify-between items-end mt-auto">
+                                                    <div>
+                                                        {item.tag && (
+                                                            <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[9px] sm:text-[10px] px-1.5 py-0">
+                                                                {item.tag}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <div className="bg-primary/5 p-1.5 sm:p-2 rounded-full group-hover:bg-primary group-hover:text-white transition-colors text-primary">
+                                                        <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </motion.div>
+                            ))}
+                        </div>
+
+                        {filteredItems.length === 0 && (
+                            <div className="text-center py-20 text-muted-foreground">
+                                No items found in this category.
                             </div>
-                        ))}
+                        )}
                     </div>
                 </div>
             </section>
+
+            {/* Item Modal Popup */}
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <DialogContent className="sm:max-w-lg p-0 overflow-hidden rounded-2xl border-none">
+                    {selectedItem && (
+                        <div className="flex flex-col">
+                            <div className="relative h-64 w-full">
+                                <img
+                                    src={selectedItem.image}
+                                    alt={selectedItem.name}
+                                    className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
+                            </div>
+                            <div className="p-4 sm:p-6 pt-0 -mt-8 relative z-10 space-y-4 sm:space-y-6">
+                                <div>
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end mb-2 gap-1">
+                                        <DialogTitle className="text-2xl sm:text-3xl font-serif font-bold">
+                                            {selectedItem.name}
+                                        </DialogTitle>
+                                        <span className="text-xl sm:text-2xl font-serif text-primary font-bold">
+                                            {selectedItem.price}
+                                        </span>
+                                    </div>
+                                    {selectedItem.tag && (
+                                        <Badge className="bg-primary/20 text-primary hover:bg-primary/30 mb-3 sm:mb-4">{selectedItem.tag}</Badge>
+                                    )}
+                                    <DialogDescription className="text-sm sm:text-base text-foreground/80 leading-relaxed italic">
+                                        {selectedItem.description}
+                                    </DialogDescription>
+                                </div>
+                                
+                                <div className="bg-muted/50 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3">
+                                    <h4 className="font-bold text-[10px] sm:text-sm uppercase tracking-wider text-muted-foreground">Special Instructions</h4>
+                                    <textarea 
+                                        placeholder="Any allergies or specific prep requests?"
+                                        className="w-full bg-background border border-border rounded-md text-sm p-3 focus:outline-none focus:ring-1 focus:ring-primary min-h-[60px] sm:min-h-[80px]"
+                                    ></textarea>
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-2">
+                                    <div className="flex items-center justify-between border border-border rounded-lg bg-background overflow-hidden">
+                                        <button 
+                                            onClick={() => setSelectedQuantity(Math.max(1, selectedQuantity - 1))}
+                                            className="p-3 hover:bg-muted transition-colors text-foreground flex-1 flex justify-center"
+                                        >
+                                            <Minus className="w-4 h-4" />
+                                        </button>
+                                        <span className="w-12 text-center font-bold text-lg">{selectedQuantity}</span>
+                                        <button 
+                                            onClick={() => setSelectedQuantity(selectedQuantity + 1)}
+                                            className="p-3 hover:bg-muted transition-colors text-foreground flex-1 flex justify-center"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <Button 
+                                        className="flex-1 h-12 text-lg font-serif group"
+                                        onClick={handleAddToCart}
+                                    >
+                                        Add to Cart <span className="ml-2 font-sans opacity-80 text-sm sm:text-base">(KSh {(calculateItemPrice(selectedItem.price) * selectedQuantity).toLocaleString()})</span>
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             {/* Footer CTA */}
             <section className="pb-24 pt-12">
@@ -148,3 +252,4 @@ export default function MenuPage() {
         </div>
     );
 }
+

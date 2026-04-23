@@ -20,6 +20,7 @@ export default function CartPage() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
+    const [orderType, setOrderType] = useState<"delivery" | "pickup">("delivery");
 
     const [checkoutForm, setCheckoutForm] = useState({
         customerName: "",
@@ -30,7 +31,7 @@ export default function CartPage() {
     });
 
     const orderMutation = useMutation({
-        mutationFn: async (data: Omit<InsertOrder, "totalAmount" | "items">) => {
+        mutationFn: async (data: Partial<InsertOrder>) => {
             const payload = {
                 ...data,
                 totalAmount: total,
@@ -45,7 +46,26 @@ export default function CartPage() {
             const res = await apiRequest("POST", "/api/orders", payload);
             return res.json();
         },
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+            if (checkoutForm.paymentMethod === "card") {
+                try {
+                    const sessionRes = await apiRequest("POST", "/api/create-checkout-session", { orderId: data.id });
+                    const sessionData = await sessionRes.json();
+                    if (sessionData.url) {
+                        clearCart();
+                        window.location.href = sessionData.url;
+                        return;
+                    }
+                } catch (error: any) {
+                    toast({
+                        title: "Payment Setup Failed",
+                        description: "Could not initialize secure checkout. Please try again.",
+                        variant: "destructive",
+                    });
+                    return;
+                }
+            }
+
             setCompletedOrderId(data.id);
             toast({
                 title: "Order Placed Successfully!",
@@ -61,6 +81,8 @@ export default function CartPage() {
             });
         }
     });
+
+    const estimatedTime = orderType === "delivery" ? "45-60 minutes" : "20-30 minutes";
 
     const handleCheckout = (e: React.FormEvent) => {
         e.preventDefault();
@@ -80,6 +102,12 @@ export default function CartPage() {
                     <CardContent className="pt-6">
                         <p className="text-sm text-muted-foreground mb-4">
                             We've sent a confirmation email to {checkoutForm.customerEmail}.
+                        </p>
+                        <div className="bg-primary/10 p-4 rounded-lg mb-6 border border-primary/20">
+                            <p className="font-bold text-lg text-primary mb-1">Estimated {orderType === "delivery" ? "Arrival" : "Pickup"} Time</p>
+                            <p className="text-2xl font-serif text-foreground">{estimatedTime}</p>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-4">
                             You can track your order status using the button below.
                         </p>
                         <Link href="/track-order">
@@ -111,7 +139,7 @@ export default function CartPage() {
     return (
         <div className="pt-24 min-h-screen bg-background pb-12">
             <div className="container mx-auto px-4">
-                <h1 className="text-4xl font-serif font-bold mb-8 text-center">
+                <h1 className="text-3xl sm:text-4xl font-serif font-bold mb-6 sm:mb-8 text-center">
                     {step === "cart" ? "Your Cart" : "Checkout"}
                 </h1>
 
@@ -126,43 +154,43 @@ export default function CartPage() {
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
-                                        className="flex gap-4 p-4 rounded-xl border border-border bg-card"
+                                        className="flex gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-border bg-card shadow-sm"
                                     >
-                                        <div className="h-24 w-24 rounded-lg overflow-hidden shrink-0">
+                                        <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-lg overflow-hidden shrink-0">
                                             <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
                                         </div>
-                                        <div className="flex-1 flex flex-col justify-between">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className="font-serif font-bold text-lg">{item.name}</h3>
-                                                    <p className="text-primary font-medium">{item.price}</p>
+                                        <div className="flex-1 flex flex-col justify-between min-w-0">
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div className="min-w-0">
+                                                    <h3 className="font-serif font-bold text-base sm:text-lg truncate">{item.name}</h3>
+                                                    <p className="text-primary font-medium text-sm sm:text-base">{item.price}</p>
                                                 </div>
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="text-destructive hover:text-destructive/80"
+                                                    className="text-destructive hover:text-destructive/80 shrink-0 h-8 w-8"
                                                     onClick={() => removeFromCart(item.id)}
                                                 >
-                                                    <Trash2 className="h-5 w-5" />
+                                                    <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
                                                 </Button>
                                             </div>
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-2 sm:gap-3 mt-2">
                                                 <Button
                                                     variant="outline"
                                                     size="icon"
-                                                    className="h-8 w-8 rounded-full"
+                                                    className="h-9 w-9 sm:h-8 sm:w-8 rounded-full"
                                                     onClick={() => updateQuantity(item.id, item.quantity - 1)}
                                                 >
-                                                    <Minus className="h-3 w-3" />
+                                                    <Minus className="h-4 w-4 sm:h-3 sm:w-3" />
                                                 </Button>
-                                                <span className="w-8 text-center font-medium">{item.quantity}</span>
+                                                <span className="w-8 text-center font-bold">{item.quantity}</span>
                                                 <Button
                                                     variant="outline"
                                                     size="icon"
-                                                    className="h-8 w-8 rounded-full"
+                                                    className="h-9 w-9 sm:h-8 sm:w-8 rounded-full"
                                                     onClick={() => updateQuantity(item.id, item.quantity + 1)}
                                                 >
-                                                    <Plus className="h-3 w-3" />
+                                                    <Plus className="h-4 w-4 sm:h-3 sm:w-3" />
                                                 </Button>
                                             </div>
                                         </div>
@@ -171,6 +199,28 @@ export default function CartPage() {
                             </div>
                         ) : (
                             <form id="checkout-form" onSubmit={handleCheckout} className="space-y-4">
+                                <div className="space-y-4 pb-4 border-b border-border">
+                                    <Label className="text-lg font-serif font-bold">Order Type</Label>
+                                    <div className="flex gap-4">
+                                        <Button
+                                            type="button"
+                                            variant={orderType === "delivery" ? "default" : "outline"}
+                                            className="flex-1"
+                                            onClick={() => setOrderType("delivery")}
+                                        >
+                                            Delivery
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant={orderType === "pickup" ? "default" : "outline"}
+                                            className="flex-1"
+                                            onClick={() => setOrderType("pickup")}
+                                        >
+                                            Pickup
+                                        </Button>
+                                    </div>
+                                </div>
+                                
                                 <div className="grid md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="name">Full Name</Label>
@@ -201,16 +251,18 @@ export default function CartPage() {
                                         onChange={e => setCheckoutForm({ ...checkoutForm, customerPhone: e.target.value })}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="address">Delivery Address</Label>
-                                    <Textarea
-                                        id="address"
-                                        required
-                                        className="min-h-[100px]"
-                                        value={checkoutForm.deliveryAddress}
-                                        onChange={e => setCheckoutForm({ ...checkoutForm, deliveryAddress: e.target.value })}
-                                    />
-                                </div>
+                                {orderType === "delivery" && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="address">Delivery Address</Label>
+                                        <Textarea
+                                            id="address"
+                                            required
+                                            className="min-h-[100px]"
+                                            value={checkoutForm.deliveryAddress}
+                                            onChange={e => setCheckoutForm({ ...checkoutForm, deliveryAddress: e.target.value })}
+                                        />
+                                    </div>
+                                )}
 
                                 <div className="space-y-4 pt-4">
                                     <Label className="text-lg font-serif font-bold">Payment Method</Label>

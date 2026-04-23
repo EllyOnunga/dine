@@ -3,9 +3,17 @@ import { type Server } from "http";
 import { requireAuth, getAuth } from "@clerk/express";
 import { storage } from "./storage";
 import { insertReservationSchema, insertNewsletterSchema, insertBlogSchema, insertEnquirySchema, insertMenuItemSchema, insertOrderSchema } from "@shared/schema";
+import { upload } from "./lib/cloudinary";
 import { ZodError } from "zod";
 import { sendReservationConfirmation, sendReservationNotificationToAdmin, sendEnquiryNotification, sendEnquiryConfirmation, sendNewsletterWelcome, sendOrderStatusUpdate, sendOrderCustomMessage, sendOrderDetailsEmail, sendOrderNotificationToAdmin } from "./email";
 import { logger } from "./logger";
+// @ts-ignore
+import Stripe from "stripe";
+
+// Initialize Stripe with a fallback for local testing
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_dummy", {
+  apiVersion: "2023-10-16" as any,
+});
 
 async function syncAndGetLocalUser(req: any) {
   const { userId: clerkId, sessionClaims } = getAuth(req);
@@ -101,7 +109,131 @@ export async function registerRoutes(
       }
     ];
     await storage.seedSuites(defaultSuites as any);
+    await storage.seedAll();
   }
+
+  // Content Management API (Public)
+  app.get("/api/settings", async (_req, res) => {
+    const settings = await storage.getSiteSettings();
+    res.json(settings);
+  });
+
+  app.get("/api/content/:section", async (req, res) => {
+    const content = await storage.getSiteContent(req.params.section);
+    res.json(content);
+  });
+
+  app.get("/api/testimonials", async (_req, res) => {
+    const testimonials = await storage.getTestimonials();
+    res.json(testimonials);
+  });
+
+  app.get("/api/faqs", async (_req, res) => {
+    const faqs = await storage.getFAQs();
+    res.json(faqs);
+  });
+
+  // Content Management API (Admin)
+  app.patch("/api/admin/settings", async (req, res) => {
+    if (!(req as any).user?.isAdmin) return res.sendStatus(403);
+    const settings = await storage.updateSiteSettings(req.body);
+    res.json(settings);
+  });
+
+  app.post("/api/admin/content", async (req, res) => {
+    if (!(req as any).user?.isAdmin) return res.sendStatus(403);
+    const content = await storage.createSiteContent(req.body);
+    res.json(content);
+  });
+
+  app.patch("/api/admin/content/:id", async (req, res) => {
+    if (!(req as any).user?.isAdmin) return res.sendStatus(403);
+    const content = await storage.updateSiteContent(req.params.id, req.body);
+    res.json(content);
+  });
+
+  app.delete("/api/admin/content/:id", async (req, res) => {
+    if (!(req as any).user?.isAdmin) return res.sendStatus(403);
+    await storage.deleteSiteContent(req.params.id);
+    res.sendStatus(200);
+  });
+
+  app.post("/api/admin/testimonials", async (req, res) => {
+    if (!(req as any).user?.isAdmin) return res.sendStatus(403);
+    const testimonial = await storage.createTestimonial(req.body);
+    res.json(testimonial);
+  });
+
+  app.delete("/api/admin/testimonials/:id", async (req, res) => {
+    if (!(req as any).user?.isAdmin) return res.sendStatus(403);
+    await storage.deleteTestimonial(req.params.id);
+    res.sendStatus(200);
+  });
+
+  app.post("/api/admin/faqs", async (req, res) => {
+    if (!(req as any).user?.isAdmin) return res.sendStatus(403);
+    const faq = await storage.createFAQ(req.body);
+    res.json(faq);
+  });
+
+  app.delete("/api/admin/faqs/:id", async (req, res) => {
+    if (!(req as any).user?.isAdmin) return res.sendStatus(403);
+    await storage.deleteFAQ(req.params.id);
+    res.sendStatus(200);
+  });
+
+  // Image Upload (Cloudinary)
+  app.post("/api/admin/upload", upload.single('image'), async (req, res) => {
+    if (!(req as any).user?.isAdmin) return res.sendStatus(403);
+    if (!req.file) return res.status(400).send("No file uploaded");
+    
+    // req.file.path contains the Cloudinary URL when using CloudinaryStorage
+    res.json({ url: (req.file as any).path });
+  });
+
+  // Instagram Cache
+  let instagramCache: { data: any, timestamp: number } | null = null;
+  const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
+  app.get("/api/social/instagram", async (_req, res) => {
+    try {
+      // Check cache
+      if (instagramCache && (Date.now() - instagramCache.timestamp < CACHE_DURATION)) {
+        return res.json(instagramCache.data);
+      }
+
+      const settings = await storage.getSiteSettings();
+      const token = settings.instagramAccessToken;
+
+      if (!token) {
+        // Fallback to empty feed if no token
+        return res.json([]);
+      }
+
+      const response = await fetch(
+        `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&access_token=${token}&limit=12`
+      );
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        logger.error({ errData, status: response.status }, "Instagram API error");
+        // If API fails but we have old cache, return it
+        if (instagramCache) return res.json(instagramCache.data);
+        return res.json([]);
+      }
+
+      const rawData: any = await response.json();
+      const media = rawData.data?.filter((m: any) => m.media_type === "IMAGE" || m.media_type === "CAROUSEL_ALBUM") || [];
+      
+      // Update cache
+      instagramCache = { data: media, timestamp: Date.now() };
+      res.json(media);
+    } catch (err) {
+      logger.error({ err }, "Failed to fetch Instagram feed");
+      if (instagramCache) return res.json(instagramCache.data);
+      res.json([]);
+    }
+  });
 
   // Public API
   app.get("/api/menu", async (_req, res) => {
@@ -229,6 +361,40 @@ export async function registerRoutes(
         message: "Failed to fetch user profile",
         error: err instanceof Error ? err.message : String(err)
       });
+    }
+  });
+
+  app.get("/api/user/orders", requireAuth(), async (req: any, res) => {
+    try {
+      const { sessionClaims } = getAuth(req);
+      const email = sessionClaims?.email as string;
+      
+      if (!email) {
+        return res.status(400).json({ message: "User email not found in session" });
+      }
+      
+      const orders = await storage.getOrdersByEmail(email);
+      res.json(orders);
+    } catch (err) {
+      logger.error({ err }, "Failed to fetch user orders");
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/user/reservations", requireAuth(), async (req: any, res) => {
+    try {
+      const { sessionClaims } = getAuth(req);
+      const email = sessionClaims?.email as string;
+      
+      if (!email) {
+        return res.status(400).json({ message: "User email not found in session" });
+      }
+      
+      const reservations = await storage.getReservationsByEmail(email);
+      res.json(reservations);
+    } catch (err) {
+      logger.error({ err }, "Failed to fetch user reservations");
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -463,6 +629,46 @@ export async function registerRoutes(
       });
     } catch (err) {
       res.status(500).json({ message: "Failed to track order" });
+    }
+  });
+
+  app.post("/api/create-checkout-session", async (req, res) => {
+    try {
+      const { orderId } = req.body;
+      const order = await storage.getOrder(orderId);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // If no valid Stripe secret key is present, provide a mock checkout URL for local testing
+      if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === "sk_test_dummy") {
+        logger.info({ orderId }, "Simulating Stripe Checkout (No STRIPE_SECRET_KEY found)");
+        return res.json({ url: `/track-order?session_id=mock_local_session` });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: order.items.map((item: any) => ({
+          price_data: {
+            currency: "kes",
+            product_data: {
+              name: item.itemName,
+            },
+            unit_amount: Math.round(item.price * 100),
+          },
+          quantity: item.quantity,
+        })),
+        mode: "payment",
+        success_url: `${req.protocol}://${req.get("host")}/track-order?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.protocol}://${req.get("host")}/cart?canceled=true`,
+        client_reference_id: orderId.toString(),
+      });
+
+      res.json({ url: session.url });
+    } catch (err: any) {
+      logger.error({ err }, 'Stripe session creation failed');
+      res.status(500).json({ message: "Error creating checkout session: " + err.message });
     }
   });
 

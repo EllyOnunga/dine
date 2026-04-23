@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useClerk } from "@clerk/clerk-react";
-import { MenuItem, Reservation, Enquiry, Blog, NewsletterLead, Order, OrderItem, SiteSetting } from "@shared/schema";
+import { MenuItem, Reservation, Enquiry, Blog, NewsletterLead, Order, OrderItem, SiteSetting, SiteContent, FAQ, Testimonial } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +24,12 @@ import {
     CheckCircle2,
     XCircle,
     Image as ImageIcon,
-    ShoppingBag
+    ShoppingBag,
+    Layout,
+    Star,
+    HelpCircle,
+    MapPin,
+    Upload
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -65,6 +71,10 @@ export default function AdminDashboard() {
     const { data: orders, isLoading: loadingOrders } = useQuery<(Order & { items: OrderItem[] })[]>({ queryKey: ["/api/admin/orders"] });
     const { data: analytics } = useQuery<Analytics>({ queryKey: ["/api/admin/analytics"] });
     const { data: settings } = useQuery<SiteSetting>({ queryKey: ["/api/admin/settings"] });
+    const { data: siteContent } = useQuery<SiteContent[]>({ queryKey: ["/api/content/all"] }); // Optional, might need filter
+    const { data: allTestimonials } = useQuery<Testimonial[]>({ queryKey: ["/api/testimonials"] });
+    const { data: allFaqs } = useQuery<FAQ[]>({ queryKey: ["/api/faqs"] });
+
 
     // State for Dialogs
     const [isMenuDialogOpen, setIsMenuDialogOpen] = useState(false);
@@ -171,6 +181,82 @@ export default function AdminDashboard() {
         }
     });
 
+    const updateSettingsMutation = useMutation({
+        mutationFn: async (data: Partial<SiteSetting>) => {
+            return apiRequest("PATCH", "/api/admin/settings", data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+            toast({ title: "Settings updated successfully" });
+        },
+        onError: (err: Error) => {
+            toast({ title: "Failed to update settings", description: err.message, variant: "destructive" });
+        }
+    });
+
+    const updateContentMutation = useMutation({
+        mutationFn: async ({ id, data }: { id: string, data: Partial<SiteContent> }) => {
+            return apiRequest("PATCH", `/api/admin/content/${id}`, data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/content/all"] });
+            toast({ title: "Content updated" });
+        }
+    });
+
+    const saveTestimonialMutation = useMutation({
+        mutationFn: async (data: Partial<Testimonial>) => {
+            return apiRequest("POST", "/api/admin/testimonials", data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/testimonials"] });
+            toast({ title: "Testimonial added" });
+        }
+    });
+
+    const deleteTestimonialMutation = useMutation({
+        mutationFn: async (id: string) => apiRequest("DELETE", `/api/admin/testimonials/${id}`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/testimonials"] });
+            toast({ title: "Testimonial removed" });
+        }
+    });
+
+    const saveFAQMutation = useMutation({
+        mutationFn: async (data: Partial<FAQ>) => {
+            return apiRequest("POST", "/api/admin/faqs", data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/faqs"] });
+            toast({ title: "FAQ added" });
+        }
+    });
+
+    const deleteFAQMutation = useMutation({
+        mutationFn: async (id: string) => apiRequest("DELETE", `/api/admin/faqs/${id}`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/faqs"] });
+            toast({ title: "FAQ removed" });
+        }
+    });
+
+    const uploadImageMutation = useMutation({
+        mutationFn: async (file: File) => {
+            const formData = new FormData();
+            formData.append("image", file);
+            const res = await fetch("/api/admin/upload", {
+                method: "POST",
+                body: formData,
+            });
+            if (!res.ok) throw new Error("Upload failed");
+            return res.json();
+        },
+        onSuccess: (data) => {
+            toast({ title: "Image uploaded", description: "URL copied to clipboard" });
+            navigator.clipboard.writeText(data.url);
+        }
+    });
+
     const openMenuDialog = (item: MenuItem | null = null) => {
         if (item) {
             setEditingMenuItem(item);
@@ -217,15 +303,15 @@ export default function AdminDashboard() {
 
     return (
         <div className="container mx-auto px-4 py-24 min-h-screen">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 sm:mb-12 gap-6">
                 <div>
-                    <h1 className="text-4xl font-serif font-bold text-foreground">Admin Control Panel</h1>
-                    <p className="text-muted-foreground">Manage your bistro's operations and content.</p>
+                    <h1 className="text-3xl sm:text-4xl font-serif font-bold text-foreground">Admin Control Panel</h1>
+                    <p className="text-sm sm:text-base text-muted-foreground">Manage your bistro's operations and content.</p>
                 </div>
-                <div className="flex gap-4">
-                    <Button variant="outline" onClick={() => window.location.href = "/"}>View Site</Button>
+                <div className="flex gap-3 w-full sm:w-auto">
+                    <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => window.location.href = "/"}>View Site</Button>
                     <Button
-                        className="bg-primary hover:bg-primary/90"
+                        className="bg-primary hover:bg-primary/90 flex-1 sm:flex-none"
                         onClick={() => signOut({ redirectUrl: '/' })}
                     >
                         Sign Out
@@ -233,687 +319,1036 @@ export default function AdminDashboard() {
                 </div>
             </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-                <TabsList className="bg-muted/50 p-1 rounded-xl w-full justify-start overflow-x-auto">
-                    <TabsTrigger value="analytics" className="gap-2"><ShoppingBag className="w-4 h-4" /> Analytics</TabsTrigger>
-                    <TabsTrigger value="reservations" className="gap-2"><Calendar className="w-4 h-4" /> Reservations</TabsTrigger>
-                    <TabsTrigger value="orders" className="gap-2"><ShoppingBag className="w-4 h-4" /> Orders</TabsTrigger>
-                    <TabsTrigger value="enquiries" className="gap-2"><MessageSquare className="w-4 h-4" /> Enquiries</TabsTrigger>
-                    <TabsTrigger value="menu" className="gap-2"><Utensils className="w-4 h-4" /> Menu Management</TabsTrigger>
-                    <TabsTrigger value="blogs" className="gap-2"><BookOpen className="w-4 h-4" /> Blogs</TabsTrigger>
-                    <TabsTrigger value="newsletter" className="gap-2"><Mail className="w-4 h-4" /> Newsletter</TabsTrigger>
-                    <TabsTrigger value="settings" className="gap-2"><ImageIcon className="w-4 h-4" /> Settings</TabsTrigger>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col lg:flex-row gap-8 items-start">
+                <TabsList className="bg-background border border-border/50 shadow-sm p-1 sm:p-4 rounded-xl w-full lg:w-64 h-fit flex flex-row lg:flex-col justify-start items-stretch gap-2 overflow-x-auto lg:overflow-x-visible no-scrollbar px-4 sm:px-4">
+                    <TabsTrigger value="analytics" className="justify-start gap-3 px-4 py-3 whitespace-nowrap"><ShoppingBag className="w-5 h-5" /> Analytics</TabsTrigger>
+                    <TabsTrigger value="reservations" className="justify-start gap-3 px-4 py-3 whitespace-nowrap"><Calendar className="w-5 h-5" /> Reservations</TabsTrigger>
+                    <TabsTrigger value="orders" className="justify-start gap-3 px-4 py-3 whitespace-nowrap"><ShoppingBag className="w-5 h-5" /> Orders</TabsTrigger>
+                    <TabsTrigger value="enquiries" className="justify-start gap-3 px-4 py-3 whitespace-nowrap"><MessageSquare className="w-5 h-5" /> Messages</TabsTrigger>
+                    <TabsTrigger value="menu" className="justify-start gap-3 px-4 py-3 whitespace-nowrap"><Utensils className="w-5 h-5" /> Menu</TabsTrigger>
+                    <TabsTrigger value="blogs" className="justify-start gap-3 px-4 py-3 whitespace-nowrap"><BookOpen className="w-5 h-5" /> Blogs</TabsTrigger>
+                    <TabsTrigger value="newsletter" className="justify-start gap-3 px-4 py-3 whitespace-nowrap"><Mail className="w-5 h-5" /> Newsletter</TabsTrigger>
+                    <TabsTrigger value="cms" className="justify-start gap-3 px-4 py-3 lg:mt-4 lg:border-t lg:border-border/50 lg:pt-6 rounded-none data-[state=active]:bg-primary/5 whitespace-nowrap"><Layout className="w-5 h-5" /> CMS Manager</TabsTrigger>
+                    <TabsTrigger value="settings" className="justify-start gap-3 px-4 py-3 rounded-none data-[state=active]:bg-primary/5 whitespace-nowrap"><ImageIcon className="w-5 h-5" /> Social API</TabsTrigger>
                 </TabsList>
 
-                {/* Reservations Tab */}
-                <TabsContent value="reservations">
-                    <div className="grid gap-6">
+                <div className="flex-1 w-full bg-background/50 border border-border/50 p-6 rounded-xl shadow-sm min-h-[600px]">
+
+                    {/* Reservations Tab */}
+                    <TabsContent value="reservations">
+                        <div className="grid gap-6">
+                            <Card className="border-border/50 shadow-sm">
+                                <CardHeader>
+                                    <CardTitle className="font-serif">Active Reservations</CardTitle>
+                                    <CardDescription>View and manage table bookings.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-0 sm:p-6">
+                                    <div className="hidden md:block overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead>
+                                                <tr className="border-b border-border text-sm font-medium text-muted-foreground">
+                                                    <th className="pb-4 px-4">Guest</th>
+                                                    <th className="pb-4 px-4">Date & Time</th>
+                                                    <th className="pb-4 px-4">Party Size</th>
+                                                    <th className="pb-4 px-4">Special Requests</th>
+                                                    <th className="pb-4 px-4 text-right">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border">
+                                                {reservations?.map((res) => (
+                                                    <tr key={res.id} className="text-sm">
+                                                        <td className="py-4 px-4 font-medium">
+                                                            {res.name}<br />
+                                                            <a href={`mailto:${res.email}`} className="text-xs text-muted-foreground hover:text-primary hover:underline">{res.email}</a>
+                                                        </td>
+                                                        <td className="py-4 px-4">{res.date} at {res.time}</td>
+                                                        <td className="py-4 px-4">{res.guests} people</td>
+                                                        <td className="py-4 px-4 italic text-muted-foreground max-w-xs truncate">{res.requests || "None"}</td>
+                                                        <td className="py-4 px-4 text-right">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                                onClick={() => deleteReservation.mutate(res.id)}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Mobile Cards for Reservations */}
+                                    <div className="md:hidden divide-y divide-border">
+                                        {reservations?.map((res) => (
+                                            <div key={res.id} className="p-4 space-y-3">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <div className="font-bold text-base">{res.name}</div>
+                                                        <div className="text-xs text-muted-foreground">{res.email}</div>
+                                                    </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="text-destructive h-8 w-8"
+                                                        onClick={() => deleteReservation.mutate(res.id)}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                                    <div>
+                                                        <span className="text-muted-foreground block text-[10px] uppercase">Date & Time</span>
+                                                        {res.date} @ {res.time}
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-muted-foreground block text-[10px] uppercase">Party Size</span>
+                                                        {res.guests} guests
+                                                    </div>
+                                                </div>
+                                                {res.requests && (
+                                                    <div className="bg-muted/30 p-2 rounded text-xs italic">
+                                                        {res.requests}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
+
+                    {/* Orders Tab */}
+                    <TabsContent value="orders">
                         <Card className="border-border/50 shadow-sm">
                             <CardHeader>
-                                <CardTitle className="font-serif">Active Reservations</CardTitle>
-                                <CardDescription>View and manage table bookings.</CardDescription>
+                                <CardTitle className="font-serif">Incoming Orders</CardTitle>
+                                <CardDescription>View and manage delivery orders. Updating status sends an automated email to the customer.</CardDescription>
                             </CardHeader>
-                            <CardContent>
-                                <div className="overflow-x-auto">
+                            <CardContent className="p-0 sm:p-6">
+                                <div className="hidden lg:block overflow-x-auto">
                                     <table className="w-full text-left">
                                         <thead>
                                             <tr className="border-b border-border text-sm font-medium text-muted-foreground">
-                                                <th className="pb-4 px-4">Guest</th>
-                                                <th className="pb-4 px-4">Date & Time</th>
-                                                <th className="pb-4 px-4">Party Size</th>
-                                                <th className="pb-4 px-4">Special Requests</th>
-                                                <th className="pb-4 px-4 text-right">Actions</th>
+                                                <th className="pb-4 px-4">Order Details</th>
+                                                <th className="pb-4 px-4">Customer Info</th>
+                                                <th className="pb-4 px-4">Items</th>
+                                                <th className="pb-4 px-4">Total</th>
+                                                <th className="pb-4 px-4">Manage Status</th>
+                                                <th className="pb-4 px-4 text-right">Date</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border">
-                                            {reservations?.map((res) => (
-                                                <tr key={res.id} className="text-sm">
-                                                    <td className="py-4 px-4 font-medium">
-                                                        {res.name}<br />
-                                                        <a href={`mailto:${res.email}`} className="text-xs text-muted-foreground hover:text-primary hover:underline">{res.email}</a>
+                                            {orders?.map((order) => (
+                                                <tr key={order.id} className="text-sm">
+                                                    <td className="py-4 px-4">
+                                                        <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase tracking-tighter">ID: {order.id.slice(0, 8)}</div>
+                                                        <div className="font-bold flex items-center gap-2">
+                                                            <ShoppingBag className="w-3 h-3 text-primary" />
+                                                            Order #{order.id.slice(-4).toUpperCase()}
+                                                        </div>
                                                     </td>
-                                                    <td className="py-4 px-4">{res.date} at {res.time}</td>
-                                                    <td className="py-4 px-4">{res.guests} people</td>
-                                                    <td className="py-4 px-4 italic text-muted-foreground max-w-xs truncate">{res.requests || "None"}</td>
+                                                    <td className="py-4 px-4">
+                                                        <div className="font-medium text-foreground">{order.customerName}</div>
+                                                        <div className="text-xs text-muted-foreground">{order.customerPhone}</div>
+                                                        <div className="text-[10px] text-muted-foreground max-w-[200px] leading-tight mt-1">{order.deliveryAddress}</div>
+                                                    </td>
+                                                    <td className="py-4 px-4">
+                                                        <div className="space-y-1">
+                                                            {order.items.map((item) => (
+                                                                <div key={item.id} className="text-xs flex justify-between gap-4">
+                                                                    <span className="text-muted-foreground">{item.quantity}x {item.itemName}</span>
+                                                                    <span className="font-medium">KSh {item.price.toLocaleString()}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 px-4">
+                                                        <div className="font-bold text-primary">KSh {order.totalAmount.toLocaleString()}</div>
+                                                    </td>
+                                                    <td className="py-4 px-4">
+                                                        <div className="flex flex-col gap-2">
+                                                            <Select
+                                                                defaultValue={order.status}
+                                                                onValueChange={(status) => updateOrderStatus.mutate({ id: order.id, status })}
+                                                            >
+                                                                <SelectTrigger className="w-[160px] h-8 text-xs">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="pending">Pending</SelectItem>
+                                                                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                                                                    <SelectItem value="preparing">Preparing</SelectItem>
+                                                                    <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                                                                    <SelectItem value="delivered">Delivered</SelectItem>
+                                                                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-7 text-[10px] gap-1"
+                                                                onClick={() => setSendMessageOrderId(order.id)}
+                                                            >
+                                                                <Mail className="w-3 h-3" />
+                                                                Send Message
+                                                            </Button>
+                                                        </div>
+                                                        <div className="mt-1 text-[10px] text-muted-foreground text-center italic">
+                                                            Current: {order.status.replace('_', ' ')}
+                                                        </div>
+                                                    </td>
                                                     <td className="py-4 px-4 text-right">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                            onClick={() => deleteReservation.mutate(res.id)}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
+                                                        <div className="text-xs font-medium">
+                                                            {order.createdAt ? format(new Date(order.createdAt), "MMM d") : "Unknown"}
+                                                        </div>
+                                                        <div className="text-[10px] text-muted-foreground">
+                                                            {order.createdAt ? format(new Date(order.createdAt), "HH:mm") : ""}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </TabsContent>
 
-                {/* Orders Tab */}
-                <TabsContent value="orders">
-                    <Card className="border-border/50 shadow-sm">
-                        <CardHeader>
-                            <CardTitle className="font-serif">Incoming Orders</CardTitle>
-                            <CardDescription>View and manage delivery orders. Updating status sends an automated email to the customer.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead>
-                                        <tr className="border-b border-border text-sm font-medium text-muted-foreground">
-                                            <th className="pb-4 px-4">Order Details</th>
-                                            <th className="pb-4 px-4">Customer Info</th>
-                                            <th className="pb-4 px-4">Items</th>
-                                            <th className="pb-4 px-4">Total</th>
-                                            <th className="pb-4 px-4">Manage Status</th>
-                                            <th className="pb-4 px-4 text-right">Date</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {orders?.map((order) => (
-                                            <tr key={order.id} className="text-sm">
-                                                <td className="py-4 px-4">
-                                                    <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase tracking-tighter">ID: {order.id.slice(0, 8)}</div>
-                                                    <div className="font-bold flex items-center gap-2">
-                                                        <ShoppingBag className="w-3 h-3 text-primary" />
-                                                        Order #{order.id.slice(-4).toUpperCase()}
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-4">
-                                                    <div className="font-medium text-foreground">{order.customerName}</div>
+                                {/* Mobile Cards for Orders */}
+                                <div className="lg:hidden divide-y divide-border">
+                                    {orders?.map((order) => (
+                                        <div key={order.id} className="p-4 space-y-4">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <div className="font-bold text-base">Order #{order.id.slice(-4).toUpperCase()}</div>
+                                                    <div className="text-[10px] font-mono text-muted-foreground italic uppercase">ID: {order.id.slice(0, 8)}</div>
+                                                </div>
+                                                <Badge className={
+                                                    order.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                                                        order.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-primary/10 text-primary'
+                                                }>
+                                                    {order.status.replace('_', ' ')}
+                                                </Badge>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-end">
+                                                    <div className="text-sm font-medium">{order.customerName}</div>
                                                     <div className="text-xs text-muted-foreground">{order.customerPhone}</div>
-                                                    <div className="text-[10px] text-muted-foreground max-w-[200px] leading-tight mt-1">{order.deliveryAddress}</div>
-                                                </td>
-                                                <td className="py-4 px-4">
-                                                    <div className="space-y-1">
-                                                        {order.items.map((item) => (
-                                                            <div key={item.id} className="text-xs flex justify-between gap-4">
-                                                                <span className="text-muted-foreground">{item.quantity}x {item.itemName}</span>
-                                                                <span className="font-medium">KSh {item.price.toLocaleString()}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-4">
-                                                    <div className="font-bold text-primary">KSh {order.totalAmount.toLocaleString()}</div>
-                                                </td>
-                                                <td className="py-4 px-4">
-                                                    <div className="flex flex-col gap-2">
-                                                        <Select
-                                                            defaultValue={order.status}
-                                                            onValueChange={(status) => updateOrderStatus.mutate({ id: order.id, status })}
-                                                        >
-                                                            <SelectTrigger className="w-[160px] h-8 text-xs">
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="pending">Pending</SelectItem>
-                                                                <SelectItem value="confirmed">Confirmed</SelectItem>
-                                                                <SelectItem value="preparing">Preparing</SelectItem>
-                                                                <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-                                                                <SelectItem value="delivered">Delivered</SelectItem>
-                                                                <SelectItem value="cancelled">Cancelled</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-7 text-[10px] gap-1"
-                                                            onClick={() => setSendMessageOrderId(order.id)}
-                                                        >
-                                                            <Mail className="w-3 h-3" />
-                                                            Send Message
-                                                        </Button>
-                                                    </div>
-                                                    <div className="mt-1 text-[10px] text-muted-foreground text-center italic">
-                                                        Current: {order.status.replace('_', ' ')}
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-4 text-right">
-                                                    <div className="text-xs font-medium">
-                                                        {order.createdAt ? format(new Date(order.createdAt), "MMM d") : "Unknown"}
-                                                    </div>
-                                                    <div className="text-[10px] text-muted-foreground">
-                                                        {order.createdAt ? format(new Date(order.createdAt), "HH:mm") : ""}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+                                                </div>
+                                                <div className="text-[10px] text-muted-foreground leading-tight bg-muted/30 p-2 rounded">
+                                                    {order.deliveryAddress}
+                                                </div>
+                                            </div>
 
-                {/* Enquiries Tab */}
-                <TabsContent value="enquiries">
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {enquiries?.map((enq) => (
-                            <Card key={enq.id} className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
-                                <CardHeader className="pb-2">
-                                    <div className="flex justify-between items-start">
-                                        <CardTitle className="text-lg font-serif">{enq.subject}</CardTitle>
-                                        <div className="flex gap-2">
-                                            <a href={`mailto:${enq.email}?subject=Re: ${enq.subject}`} title="Reply via Email">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10">
+                                            <div className="space-y-1 bg-muted/20 p-3 rounded-lg">
+                                                <div className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Items</div>
+                                                {order.items.map((item) => (
+                                                    <div key={item.id} className="text-xs flex justify-between">
+                                                        <span>{item.quantity}x {item.itemName}</span>
+                                                        <span className="font-medium">KSh {item.price.toLocaleString()}</span>
+                                                    </div>
+                                                ))}
+                                                <div className="pt-2 mt-2 border-t border-border flex justify-between font-bold text-primary">
+                                                    <span>Total</span>
+                                                    <span>KSh {order.totalAmount.toLocaleString()}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <Select
+                                                    defaultValue={order.status}
+                                                    onValueChange={(status) => updateOrderStatus.mutate({ id: order.id, status })}
+                                                >
+                                                    <SelectTrigger className="flex-1 h-9 text-xs">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="pending">Pending</SelectItem>
+                                                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                                                        <SelectItem value="preparing">Preparing</SelectItem>
+                                                        <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                                                        <SelectItem value="delivered">Delivered</SelectItem>
+                                                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <Button
+                                                    variant="outline"
+                                                    className="h-9 px-3"
+                                                    onClick={() => setSendMessageOrderId(order.id)}
+                                                >
                                                     <Mail className="w-4 h-4" />
                                                 </Button>
-                                            </a>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-destructive h-8 w-8 hover:text-destructive hover:bg-destructive/10"
-                                                onClick={() => deleteEnquiry.mutate(enq.id)}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
+                                            </div>
+                                            <div className="text-[10px] text-muted-foreground text-center">
+                                                Placed on {order.createdAt ? format(new Date(order.createdAt), "MMM d, HH:mm") : "Unknown"}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <CardDescription>
-                                        {enq.name} (<a href={`mailto:${enq.email}`} className="hover:text-primary hover:underline">{enq.email}</a>)
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-sm text-muted-foreground italic leading-relaxed">"{enq.message}"</p>
-                                    <div className="mt-4 pt-4 border-t border-border flex justify-between items-center text-[10px] text-muted-foreground uppercase tracking-widest">
-                                        <span>Received</span>
-                                        <span>{enq.createdAt ? format(new Date(enq.createdAt), "MMM d, yyyy") : "Unknown"}</span>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                </TabsContent>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
 
-                {/* Menu Management Tab */}
-                <TabsContent value="menu">
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-2xl font-serif font-bold">Menu Items</h2>
-                            <Button onClick={() => openMenuDialog()} className="bg-primary hover:bg-primary/90 gap-2"><Plus className="w-4 h-4" /> Add Item</Button>
-                        </div>
+                    {/* Enquiries Tab */}
+                    <TabsContent value="enquiries">
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {menuItems?.map((item) => (
-                                <Card key={item.id} className="overflow-hidden border-border/50">
-                                    <div className="h-40 overflow-hidden relative">
-                                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                                        <div className="absolute top-2 right-2 flex gap-2">
-                                            <Button variant="secondary" size="icon" onClick={() => openMenuDialog(item)} className="h-8 w-8 bg-white/90 backdrop-blur-sm"><Edit2 className="w-4 h-4" /></Button>
-                                            <Button
-                                                variant="destructive"
-                                                size="icon"
-                                                className="h-8 w-8"
-                                                onClick={() => deleteMenuItem.mutate(item.id)}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <CardHeader className="p-4">
+                            {enquiries?.map((enq) => (
+                                <Card key={enq.id} className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+                                    <CardHeader className="pb-2">
                                         <div className="flex justify-between items-start">
-                                            <CardTitle className="text-lg font-bold">{item.name}</CardTitle>
-                                            <span className="text-primary font-bold">{item.price}</span>
+                                            <CardTitle className="text-lg font-serif">{enq.subject}</CardTitle>
+                                            <div className="flex gap-2">
+                                                <a href={`mailto:${enq.email}?subject=Re: ${enq.subject}`} title="Reply via Email">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10">
+                                                        <Mail className="w-4 h-4" />
+                                                    </Button>
+                                                </a>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-destructive h-8 w-8 hover:text-destructive hover:bg-destructive/10"
+                                                    onClick={() => deleteEnquiry.mutate(enq.id)}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
                                         </div>
-                                        <CardDescription className="text-xs uppercase tracking-tighter text-primary/70">{item.category}</CardDescription>
+                                        <CardDescription>
+                                            {enq.name} (<a href={`mailto:${enq.email}`} className="hover:text-primary hover:underline">{enq.email}</a>)
+                                        </CardDescription>
                                     </CardHeader>
-                                    <CardContent className="p-4 pt-0">
-                                        <p className="text-sm text-muted-foreground line-clamp-2 italic">{item.description}</p>
+                                    <CardContent>
+                                        <p className="text-sm text-muted-foreground italic leading-relaxed">"{enq.message}"</p>
+                                        <div className="mt-4 pt-4 border-t border-border flex justify-between items-center text-[10px] text-muted-foreground uppercase tracking-widest">
+                                            <span>Received</span>
+                                            <span>{enq.createdAt ? format(new Date(enq.createdAt), "MMM d, yyyy") : "Unknown"}</span>
+                                        </div>
                                     </CardContent>
                                 </Card>
                             ))}
                         </div>
-                    </div>
-                </TabsContent>
+                    </TabsContent>
 
-                {/* Blogs Tab */}
-                <TabsContent value="blogs">
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-2xl font-serif font-bold">Blog Posts</h2>
-                            <Button onClick={() => openBlogDialog()} className="bg-primary hover:bg-primary/90 gap-2"><Plus className="w-4 h-4" /> Create Post</Button>
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-8">
-                            {blogs?.map((blog) => (
-                                <Card key={blog.id} className="flex flex-col md:flex-row overflow-hidden border-border/50">
-                                    <div className="md:w-48 h-48 md:h-auto overflow-hidden flex-shrink-0">
-                                        <img src={blog.image} alt={blog.title} className="w-full h-full object-cover" />
-                                    </div>
-                                    <div className="flex-1 p-6 flex flex-col justify-between">
-                                        <div>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className="text-[10px] uppercase tracking-widest text-primary font-bold">{blog.category}</span>
-                                                <div className="flex gap-2">
-                                                    <Button variant="ghost" size="icon" onClick={() => openBlogDialog(blog)} className="h-8 w-8"><Edit2 className="w-4 h-4" /></Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-destructive"
-                                                        onClick={() => deleteBlog.mutate(blog.id)}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
+                    {/* Menu Management Tab */}
+                    <TabsContent value="menu">
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-2xl font-serif font-bold">Menu Items</h2>
+                                <Button onClick={() => openMenuDialog()} className="bg-primary hover:bg-primary/90 gap-2"><Plus className="w-4 h-4" /> Add Item</Button>
+                            </div>
+                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {menuItems?.map((item) => (
+                                    <Card key={item.id} className="overflow-hidden border-border/50">
+                                        <div className="h-40 overflow-hidden relative">
+                                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                            <div className="absolute top-2 right-2 flex gap-2">
+                                                <Button variant="secondary" size="icon" onClick={() => openMenuDialog(item)} className="h-8 w-8 bg-white/90 backdrop-blur-sm"><Edit2 className="w-4 h-4" /></Button>
+                                                <Button
+                                                    variant="destructive"
+                                                    size="icon"
+                                                    className="h-8 w-8"
+                                                    onClick={() => deleteMenuItem.mutate(item.id)}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
                                             </div>
-                                            <h3 className="text-xl font-serif font-bold leading-tight mb-2">{blog.title}</h3>
-                                            <p className="text-sm text-muted-foreground line-clamp-2 mb-4">{blog.content}</p>
                                         </div>
-                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                            <span>By {blog.author}</span>
-                                            <span>{blog.createdAt ? format(new Date(blog.createdAt), "MMM d, yyyy") : ""}</span>
+                                        <CardHeader className="p-4">
+                                            <div className="flex justify-between items-start">
+                                                <CardTitle className="text-lg font-bold">{item.name}</CardTitle>
+                                                <span className="text-primary font-bold">{item.price}</span>
+                                            </div>
+                                            <CardDescription className="text-xs uppercase tracking-tighter text-primary/70">{item.category}</CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="p-4 pt-0">
+                                            <p className="text-sm text-muted-foreground line-clamp-2 italic">{item.description}</p>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    {/* Blogs Tab */}
+                    <TabsContent value="blogs">
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-2xl font-serif font-bold">Blog Posts</h2>
+                                <Button onClick={() => openBlogDialog()} className="bg-primary hover:bg-primary/90 gap-2"><Plus className="w-4 h-4" /> Create Post</Button>
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-8">
+                                {blogs?.map((blog) => (
+                                    <Card key={blog.id} className="flex flex-col md:flex-row overflow-hidden border-border/50">
+                                        <div className="md:w-48 h-48 md:h-auto overflow-hidden flex-shrink-0">
+                                            <img src={blog.image} alt={blog.title} className="w-full h-full object-cover" />
                                         </div>
+                                        <div className="flex-1 p-6 flex flex-col justify-between">
+                                            <div>
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className="text-[10px] uppercase tracking-widest text-primary font-bold">{blog.category}</span>
+                                                    <div className="flex gap-2">
+                                                        <Button variant="ghost" size="icon" onClick={() => openBlogDialog(blog)} className="h-8 w-8"><Edit2 className="w-4 h-4" /></Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-destructive"
+                                                            onClick={() => deleteBlog.mutate(blog.id)}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                <h3 className="text-xl font-serif font-bold leading-tight mb-2">{blog.title}</h3>
+                                                <p className="text-sm text-muted-foreground line-clamp-2 mb-4">{blog.content}</p>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                                <span>By {blog.author}</span>
+                                                <span>{blog.createdAt ? format(new Date(blog.createdAt), "MMM d, yyyy") : ""}</span>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    {/* Newsletter Tab */}
+                    <TabsContent value="newsletter">
+                        <Card className="border-border/50 shadow-sm">
+                            <CardHeader>
+                                <CardTitle className="font-serif">Subscribers</CardTitle>
+                                <CardDescription>Mailing list for Savannah Circle.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="max-w-2xl">
+                                    <div className="space-y-4">
+                                        {newsletter?.map((lead) => (
+                                            <div key={lead.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border/50">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="p-2 bg-primary/10 rounded-full text-primary">
+                                                        <CheckCircle2 className="w-4 h-4" />
+                                                    </div>
+                                                    <span className="font-medium">{lead.email}</span>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground">Joined {lead.createdAt ? format(new Date(lead.createdAt), "MMM d, yyyy") : "Unknown"}</span>
+                                            </div>
+                                        ))}
+                                        {newsletter?.length === 0 && (
+                                            <div className="text-center py-12 text-muted-foreground italic">
+                                                No subscribers yet.
+                                            </div>
+                                        )}
                                     </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                    {/* Analytics Tab */}
+                    <TabsContent value="analytics">
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Total Revenue</CardDescription>
+                                    <CardTitle className="text-3xl font-bold">
+                                        KSh {analytics?.totalRevenue?.toLocaleString() || 0}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-muted-foreground">From all completed orders</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Total Orders</CardDescription>
+                                    <CardTitle className="text-3xl font-bold">{analytics?.totalOrders || 0}</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-muted-foreground">All time</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Reservations</CardDescription>
+                                    <CardTitle className="text-3xl font-bold">{analytics?.totalReservations || 0}</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-muted-foreground">Total bookings</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Newsletter</CardDescription>
+                                    <CardTitle className="text-3xl font-bold">{newsletter?.length || 0}</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-muted-foreground">Subscribers</p>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                    </TabsContent>{/* CMS Manager Tab */}
+                    <TabsContent value="cms" className="space-y-6">
+                        <Tabs defaultValue="branding" className="w-full">
+                            <TabsList className="grid grid-cols-2 md:grid-cols-5 h-auto md:h-10 mb-8">
+                                <TabsTrigger value="branding">Branding</TabsTrigger>
+                                <TabsTrigger value="pages">Pages</TabsTrigger>
+                                <TabsTrigger value="testimonials">Guest Reviews</TabsTrigger>
+                                <TabsTrigger value="faqs">FAQs</TabsTrigger>
+                                <TabsTrigger value="media">Media Assets</TabsTrigger>
+                            </TabsList>
+
+                            {/* Branding Sub-tab */}
+                            <TabsContent value="branding">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Restaurant Identity</CardTitle>
+                                        <CardDescription>Update your restaurant's name, contact details, and M-Pesa information.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-6">
+                                        <div className="grid md:grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <Label>Restaurant Name</Label>
+                                                <Input defaultValue={settings?.restaurantName} onBlur={(e) => updateSettingsMutation.mutate({ restaurantName: e.target.value })} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Restaurant Tagline</Label>
+                                                <Input defaultValue={settings?.restaurantTagline} onBlur={(e) => updateSettingsMutation.mutate({ restaurantTagline: e.target.value })} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Phone Number</Label>
+                                                <Input defaultValue={settings?.phone} onBlur={(e) => updateSettingsMutation.mutate({ phone: e.target.value })} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Contact Email</Label>
+                                                <Input defaultValue={settings?.email} onBlur={(e) => updateSettingsMutation.mutate({ email: e.target.value })} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>M-Pesa Paybill</Label>
+                                                <Input defaultValue={settings?.mpesaPaybill || ''} onBlur={(e) => updateSettingsMutation.mutate({ mpesaPaybill: e.target.value })} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>M-Pesa Till</Label>
+                                                <Input defaultValue={settings?.mpesaTill || ''} onBlur={(e) => updateSettingsMutation.mutate({ mpesaTill: e.target.value })} />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Full Address</Label>
+                                            <Textarea defaultValue={settings?.address} onBlur={(e) => updateSettingsMutation.mutate({ address: e.target.value })} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Opening Hours</Label>
+                                            <Input defaultValue={settings?.openingHours} onBlur={(e) => updateSettingsMutation.mutate({ openingHours: e.target.value })} />
+                                        </div>
+                                        <div className="pt-4 flex justify-end">
+                                            <Button className="bg-primary text-white" disabled={updateSettingsMutation.isPending}>
+                                                {updateSettingsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                Save All Branding
+                                            </Button>
+                                        </div>
+                                    </CardContent>
                                 </Card>
-                            ))}
-                        </div>
-                    </div>
-                </TabsContent>
+                            </TabsContent>
 
-                {/* Newsletter Tab */}
-                <TabsContent value="newsletter">
-                    <Card className="border-border/50 shadow-sm">
-                        <CardHeader>
-                            <CardTitle className="font-serif">Subscribers</CardTitle>
-                            <CardDescription>Mailing list for Savannah Circle.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="max-w-2xl">
-                                <div className="space-y-4">
-                                    {newsletter?.map((lead) => (
-                                        <div key={lead.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border/50">
-                                            <div className="flex items-center gap-4">
-                                                <div className="p-2 bg-primary/10 rounded-full text-primary">
-                                                    <CheckCircle2 className="w-4 h-4" />
+                            {/* Page Content Sub-tab */}
+                            <TabsContent value="pages">
+                                <div className="grid gap-6">
+                                    {siteContent?.map((item) => (
+                                        <Card key={item.id} className="border-border/50">
+                                            <CardHeader className="pb-2">
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <CardTitle className="text-sm font-mono uppercase tracking-tighter text-primary">{item.section}</CardTitle>
+                                                        <CardDescription className="text-xs">{item.key.replace('_', ' ')}</CardDescription>
+                                                    </div>
+                                                    <Badge variant="outline" className="text-[10px]">{item.type}</Badge>
                                                 </div>
-                                                <span className="font-medium">{lead.email}</span>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="flex gap-4 items-end">
+                                                    <div className="flex-1">
+                                                        {item.type === 'text' || item.type === 'image' ? (
+                                                            <Input
+                                                                defaultValue={item.value}
+                                                                onBlur={(e) => updateContentMutation.mutate({ id: item.id, data: { value: e.target.value } })}
+                                                            />
+                                                        ) : (
+                                                            <Textarea
+                                                                defaultValue={item.value}
+                                                                onBlur={(e) => updateContentMutation.mutate({ id: item.id, data: { value: e.target.value } })}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                    {item.type === 'image' && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => {
+                                                                const input = document.createElement('input');
+                                                                input.type = 'file';
+                                                                input.onchange = (e: any) => {
+                                                                    const file = e.target.files[0];
+                                                                    if (file) {
+                                                                        uploadImageMutation.mutate(file, {
+                                                                            onSuccess: (data) => {
+                                                                                updateContentMutation.mutate({ id: item.id, data: { value: data.url } });
+                                                                            }
+                                                                        });
+                                                                    }
+                                                                };
+                                                                input.click();
+                                                            }}
+                                                        >
+                                                            <Upload className="w-4 h-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            </TabsContent>
+
+                            {/* Guest Reviews Sub-tab */}
+                            <TabsContent value="testimonials">
+                                <div className="space-y-6">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-lg font-bold">Manage Guest Reviews</h3>
+                                        <Button size="sm" onClick={() => {
+                                            const name = window.prompt("Guest Name");
+                                            const text = window.prompt("Review Text");
+                                            const rating = parseInt(window.prompt("Rating (1-5)") || "5");
+                                            if (name && text) saveTestimonialMutation.mutate({ name, text, rating, platform: "Google Reviews" });
+                                        }}>
+                                            <Plus className="w-4 h-4 mr-2" /> Add Review
+                                        </Button>
+                                    </div>
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        {allTestimonials?.map((t) => (
+                                            <Card key={t.id}>
+                                                <CardHeader className="pb-2">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <CardTitle className="text-sm font-bold">{t.name}</CardTitle>
+                                                            <CardDescription className="text-[10px]">{t.platform} - {t.rating} Stars</CardDescription>
+                                                        </div>
+                                                        <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => deleteTestimonialMutation.mutate(t.id)}>
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <p className="text-xs italic text-muted-foreground">"{t.text}"</p>
+                                                </CardContent>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            {/* FAQs Sub-tab */}
+                            <TabsContent value="faqs">
+                                <div className="space-y-6">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-lg font-bold">Manage FAQs</h3>
+                                        <Button size="sm" onClick={() => {
+                                            const q = window.prompt("Question");
+                                            const a = window.prompt("Answer");
+                                            if (q && a) saveFAQMutation.mutate({ question: q, answer: a, icon: "HelpCircle" });
+                                        }}>
+                                            <Plus className="w-4 h-4 mr-2" /> Add FAQ
+                                        </Button>
+                                    </div>
+                                    <div className="grid gap-4">
+                                        {allFaqs?.map((f) => (
+                                            <Card key={f.id}>
+                                                <CardHeader className="pb-2">
+                                                    <div className="flex justify-between items-start">
+                                                        <CardTitle className="text-sm font-bold">{f.question}</CardTitle>
+                                                        <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => deleteFAQMutation.mutate(f.id)}>
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <p className="text-xs text-muted-foreground">{f.answer}</p>
+                                                </CardContent>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            {/* Media Asset Manager */}
+                            <TabsContent value="media">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Asset Library</CardTitle>
+                                        <CardDescription>Upload new images to Cloudinary. Once uploaded, the URL will be copied to your clipboard.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-20 space-y-4">
+                                        <div className="p-6 bg-primary/10 rounded-full">
+                                            <Upload className="w-12 h-12 text-primary" />
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="font-bold">Upload to Cloudinary</p>
+                                            <p className="text-sm text-muted-foreground">Supports JPG, PNG, WebP up to 10MB</p>
+                                        </div>
+                                        <Button
+                                            onClick={() => {
+                                                const input = document.createElement('input');
+                                                input.type = 'file';
+                                                input.onchange = (e: any) => {
+                                                    const file = e.target.files[0];
+                                                    if (file) uploadImageMutation.mutate(file);
+                                                };
+                                                input.click();
+                                            }}
+                                            disabled={uploadImageMutation.isPending}
+                                        >
+                                            {uploadImageMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                            Select File to Upload
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        </Tabs>
+                    </TabsContent>
+
+                    {/* Settings Tab */}
+                    <TabsContent value="settings">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Restaurant Settings</CardTitle>
+                                <CardDescription>Configure operational settings for your restaurant</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <div className="space-y-2">
+                                    <Label htmlFor="openingHours">Opening Hours</Label>
+                                    <Input
+                                        id="openingHours"
+                                        defaultValue={settings?.openingHours || "08:00-22:00"}
+                                        placeholder="08:00-22:00"
+                                    />
+                                    <p className="text-xs text-muted-foreground">Format: HH:MM-HH:MM</p>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <Label>Online Ordering</Label>
+                                        <p className="text-sm text-muted-foreground">Enable or disable online ordering</p>
+                                    </div>
+                                    <Button variant="outline">
+                                        {settings?.isOrderingEnabled ? "Enabled" : "Disabled"}
+                                    </Button>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="minOrder">Minimum Order Amount (KSh)</Label>
+                                    <Input
+                                        id="minOrder"
+                                        type="number"
+                                        defaultValue={settings?.minOrderAmount || 0}
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <Button className="w-full">Save Settings</Button>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Menu Item Dialog */}
+                    <Dialog open={isMenuDialogOpen} onOpenChange={setIsMenuDialogOpen}>
+                        <DialogContent className="sm:max-w-[600px]">
+                            <DialogHeader>
+                                <DialogTitle>{editingMenuItem ? "Edit Menu Item" : "Add New Menu Item"}</DialogTitle>
+                                <DialogDescription>Fill in the details for your culinary creation.</DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="name">Item Name</Label>
+                                        <Input id="name" value={menuForm.name} onChange={(e) => setMenuForm({ ...menuForm, name: e.target.value })} placeholder="e.g. Masala Chips" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="category">Category</Label>
+                                        <Input id="category" value={menuForm.category} onChange={(e) => setMenuForm({ ...menuForm, category: e.target.value })} placeholder="e.g. Starters" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="price">Current Price</Label>
+                                        <Input id="price" value={menuForm.price} onChange={(e) => setMenuForm({ ...menuForm, price: e.target.value })} placeholder="KSh 500" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="originalPrice">Original Price (for slashed)</Label>
+                                        <Input id="originalPrice" value={menuForm.originalPrice} onChange={(e) => setMenuForm({ ...menuForm, originalPrice: e.target.value })} placeholder="KSh 650" />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="description">Description</Label>
+                                    <Textarea id="description" value={menuForm.description} onChange={(e) => setMenuForm({ ...menuForm, description: e.target.value })} placeholder="Describe the flavors..." />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="tag">Tag (Optional)</Label>
+                                        <Input id="tag" value={menuForm.tag} onChange={(e) => setMenuForm({ ...menuForm, tag: e.target.value })} placeholder="e.g. Popular" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="image">Image URL</Label>
+                                        <Input id="image" value={menuForm.image} onChange={(e) => setMenuForm({ ...menuForm, image: e.target.value })} placeholder="https://..." />
+                                    </div>
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setIsMenuDialogOpen(false)}>Cancel</Button>
+                                <Button
+                                    className="bg-primary text-white"
+                                    onClick={() => saveMenuMutation.mutate(menuForm)}
+                                    disabled={saveMenuMutation.isPending}
+                                >
+                                    {saveMenuMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    {editingMenuItem ? "Update Item" : "Create Item"}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+
+                    {/* Blog Dialog */}
+                    <Dialog open={isBlogDialogOpen} onOpenChange={setIsBlogDialogOpen}>
+                        <DialogContent className="sm:max-w-[700px]">
+                            <DialogHeader>
+                                <DialogTitle>{editingBlog ? "Edit Blog Post" : "Create New Post"}</DialogTitle>
+                                <DialogDescription>Share your Savannah stories with the world.</DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="title">Title</Label>
+                                    <Input id="title" value={blogForm.title} onChange={(e) => setBlogForm({ ...blogForm, title: e.target.value })} placeholder="How to grill like a Maasai..." />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="blogAuthor">Author</Label>
+                                        <Input id="blogAuthor" value={blogForm.author} onChange={(e) => setBlogForm({ ...blogForm, author: e.target.value })} placeholder="Name" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="blogCategory">Category</Label>
+                                        <Input id="blogCategory" value={blogForm.category} onChange={(e) => setBlogForm({ ...blogForm, category: e.target.value })} placeholder="Cuisine" />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="blogImage">Featured Image URL</Label>
+                                    <Input id="blogImage" value={blogForm.image} onChange={(e) => setBlogForm({ ...blogForm, image: e.target.value })} placeholder="https://..." />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="content">Content</Label>
+                                    <Textarea id="content" className="min-h-[200px]" value={blogForm.content} onChange={(e) => setBlogForm({ ...blogForm, content: e.target.value })} placeholder="Write your story here..." />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setIsBlogDialogOpen(false)}>Cancel</Button>
+                                <Button
+                                    className="bg-primary text-white"
+                                    onClick={() => saveBlogMutation.mutate(blogForm)}
+                                    disabled={saveBlogMutation.isPending}
+                                >
+                                    {saveBlogMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    {editingBlog ? "Update Post" : "Publish Post"}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+
+                    {/* Custom Message Dialog */}
+                    <Dialog open={sendMessageOrderId !== null} onOpenChange={(open) => !open && setSendMessageOrderId(null)}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Send Message to Customer</DialogTitle>
+                                <DialogDescription>
+                                    Send a personalized email update regarding order #{sendMessageOrderId?.slice(-4).toUpperCase()}.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="py-4">
+                                <Label htmlFor="custom-message">Your Message</Label>
+                                <Textarea
+                                    id="custom-message"
+                                    value={customMessage}
+                                    onChange={(e) => setCustomMessage(e.target.value)}
+                                    placeholder="Type your message here..."
+                                    className="min-h-[150px] mt-2"
+                                />
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setSendMessageOrderId(null)}>Cancel</Button>
+                                <Button
+                                    className="bg-primary text-white"
+                                    onClick={() => sendOrderMessage.mutate({ id: sendMessageOrderId!, message: customMessage })}
+                                    disabled={sendOrderMessage.isPending || !customMessage.trim()}
+                                >
+                                    {sendOrderMessage.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Send Email
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+
+                    {/* Analytics Tab */}
+                    <TabsContent value="analytics">
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Total Revenue</CardDescription>
+                                    <CardTitle className="text-3xl font-bold">
+                                        KSh {analytics?.totalRevenue?.toLocaleString() || 0}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-muted-foreground">From all completed orders</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Total Orders</CardDescription>
+                                    <CardTitle className="text-3xl font-bold">{analytics?.totalOrders || 0}</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-muted-foreground">All time</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Reservations</CardDescription>
+                                    <CardTitle className="text-3xl font-bold">{analytics?.totalReservations || 0}</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-muted-foreground">Total bookings</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Newsletter</CardDescription>
+                                    <CardTitle className="text-3xl font-bold">{newsletter?.length || 0}</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-muted-foreground">Subscribers</p>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <div className="grid gap-6 md:grid-cols-2 mt-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Orders by Status</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        {analytics?.ordersByStatus && Object.entries(analytics.ordersByStatus).map(([status, count]: any) => (
+                                            <div key={status} className="flex justify-between items-center">
+                                                <span className="capitalize">{status.replace('_', ' ')}</span>
+                                                <span className="font-bold">{count}</span>
                                             </div>
-                                            <span className="text-xs text-muted-foreground">Joined {lead.createdAt ? format(new Date(lead.createdAt), "MMM d, yyyy") : "Unknown"}</span>
-                                        </div>
-                                    ))}
-                                    {newsletter?.length === 0 && (
-                                        <div className="text-center py-12 text-muted-foreground italic">
-                                            No subscribers yet.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-                {/* Analytics Tab */}
-                <TabsContent value="analytics">
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardDescription>Total Revenue</CardDescription>
-                                <CardTitle className="text-3xl font-bold">
-                                    KSh {analytics?.totalRevenue?.toLocaleString() || 0}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-xs text-muted-foreground">From all completed orders</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardDescription>Total Orders</CardDescription>
-                                <CardTitle className="text-3xl font-bold">{analytics?.totalOrders || 0}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-xs text-muted-foreground">All time</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardDescription>Reservations</CardDescription>
-                                <CardTitle className="text-3xl font-bold">{analytics?.totalReservations || 0}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-xs text-muted-foreground">Total bookings</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardDescription>Newsletter</CardDescription>
-                                <CardTitle className="text-3xl font-bold">{newsletter?.length || 0}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-xs text-muted-foreground">Subscribers</p>
-                            </CardContent>
-                        </Card>
-                    </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Top Selling Items</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        {analytics?.topItems?.map((item: any, index: number) => (
+                                            <div key={index} className="flex justify-between items-center">
+                                                <span className="text-sm">{item.name}</span>
+                                                <span className="font-bold">{item.count} sold</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
 
-                    <div className="grid gap-6 md:grid-cols-2 mt-6">
+                    {/* Settings Tab */}
+                    <TabsContent value="settings">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Orders by Status</CardTitle>
+                                <CardTitle>Restaurant Settings</CardTitle>
+                                <CardDescription>Configure operational settings for your restaurant</CardDescription>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="space-y-6">
                                 <div className="space-y-2">
-                                    {analytics?.ordersByStatus && Object.entries(analytics.ordersByStatus).map(([status, count]: any) => (
-                                        <div key={status} className="flex justify-between items-center">
-                                            <span className="capitalize">{status.replace('_', ' ')}</span>
-                                            <span className="font-bold">{count}</span>
-                                        </div>
-                                    ))}
+                                    <Label htmlFor="openingHours">Opening Hours</Label>
+                                    <Input
+                                        id="openingHours"
+                                        defaultValue={settings?.openingHours || "08:00-22:00"}
+                                        placeholder="08:00-22:00"
+                                    />
+                                    <p className="text-xs text-muted-foreground">Format: HH:MM-HH:MM</p>
                                 </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Top Selling Items</CardTitle>
-                            </CardHeader>
-                            <CardContent>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <Label>Online Ordering</Label>
+                                        <p className="text-sm text-muted-foreground">Enable or disable online ordering</p>
+                                    </div>
+                                    <Button
+                                        variant={settings?.isOrderingEnabled ? "default" : "outline"}
+                                        onClick={() => updateSettingsMutation.mutate({ isOrderingEnabled: !settings?.isOrderingEnabled })}
+                                    >
+                                        {settings?.isOrderingEnabled ? "Enabled" : "Disabled"}
+                                    </Button>
+                                </div>
                                 <div className="space-y-2">
-                                    {analytics?.topItems?.map((item: any, index: number) => (
-                                        <div key={index} className="flex justify-between items-center">
-                                            <span className="text-sm">{item.name}</span>
-                                            <span className="font-bold">{item.count} sold</span>
-                                        </div>
-                                    ))}
+                                    <Label htmlFor="minOrder">Minimum Order Amount (KSh)</Label>
+                                    <Input
+                                        id="minOrder"
+                                        type="number"
+                                        defaultValue={settings?.minOrderAmount || 0}
+                                        onChange={(e) => {
+                                            // Auto-save or wait for button? The current UI suggests a button.
+                                        }}
+                                    />
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </TabsContent>
 
-                {/* Settings Tab */}
-                <TabsContent value="settings">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Restaurant Settings</CardTitle>
-                            <CardDescription>Configure operational settings for your restaurant</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="space-y-2">
-                                <Label htmlFor="openingHours">Opening Hours</Label>
-                                <Input
-                                    id="openingHours"
-                                    defaultValue={settings?.openingHours || "08:00-22:00"}
-                                    placeholder="08:00-22:00"
-                                />
-                                <p className="text-xs text-muted-foreground">Format: HH:MM-HH:MM</p>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <Label>Online Ordering</Label>
-                                    <p className="text-sm text-muted-foreground">Enable or disable online ordering</p>
+                                <div className="pt-6 border-t border-border space-y-4">
+                                    <h3 className="text-lg font-serif font-bold">Social Media Integration</h3>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="instagramToken">Instagram Access Token</Label>
+                                        <Input
+                                            id="instagram_token_input"
+                                            type="password"
+                                            placeholder="Paste your token here..."
+                                            defaultValue={settings?.instagramAccessToken || ""}
+                                        />
+                                        <p className="text-[10px] text-muted-foreground">
+                                            {settings?.instagramAccessToken
+                                                ? "✅ Connected to Instagram"
+                                                : "⚠️ Using fallback images"}
+                                        </p>
+                                    </div>
                                 </div>
-                                <Button variant="outline">
-                                    {settings?.isOrderingEnabled ? "Enabled" : "Disabled"}
+
+                                <Button
+                                    className="w-full"
+                                    onClick={() => {
+                                        const openingHours = (document.getElementById('openingHours') as HTMLInputElement).value;
+                                        const minOrderAmount = parseInt((document.getElementById('minOrder') as HTMLInputElement).value);
+                                        const instagramAccessToken = (document.getElementById('instagram_token_input') as HTMLInputElement).value;
+
+                                        updateSettingsMutation.mutate({
+                                            openingHours,
+                                            minOrderAmount,
+                                            instagramAccessToken
+                                        });
+                                    }}
+                                    disabled={updateSettingsMutation.isPending}
+                                >
+                                    {updateSettingsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Save All Settings
                                 </Button>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="minOrder">Minimum Order Amount (KSh)</Label>
-                                <Input
-                                    id="minOrder"
-                                    type="number"
-                                    defaultValue={settings?.minOrderAmount || 0}
-                                    placeholder="0"
-                                />
-                            </div>
-                            <Button className="w-full">Save Settings</Button>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                {/* Menu Item Dialog */}
-                <Dialog open={isMenuDialogOpen} onOpenChange={setIsMenuDialogOpen}>
-                    <DialogContent className="sm:max-w-[600px]">
-                        <DialogHeader>
-                            <DialogTitle>{editingMenuItem ? "Edit Menu Item" : "Add New Menu Item"}</DialogTitle>
-                            <DialogDescription>Fill in the details for your culinary creation.</DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Item Name</Label>
-                                    <Input id="name" value={menuForm.name} onChange={(e) => setMenuForm({ ...menuForm, name: e.target.value })} placeholder="e.g. Masala Chips" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="category">Category</Label>
-                                    <Input id="category" value={menuForm.category} onChange={(e) => setMenuForm({ ...menuForm, category: e.target.value })} placeholder="e.g. Starters" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="price">Current Price</Label>
-                                    <Input id="price" value={menuForm.price} onChange={(e) => setMenuForm({ ...menuForm, price: e.target.value })} placeholder="KSh 500" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="originalPrice">Original Price (for slashed)</Label>
-                                    <Input id="originalPrice" value={menuForm.originalPrice} onChange={(e) => setMenuForm({ ...menuForm, originalPrice: e.target.value })} placeholder="KSh 650" />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="description">Description</Label>
-                                <Textarea id="description" value={menuForm.description} onChange={(e) => setMenuForm({ ...menuForm, description: e.target.value })} placeholder="Describe the flavors..." />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="tag">Tag (Optional)</Label>
-                                    <Input id="tag" value={menuForm.tag} onChange={(e) => setMenuForm({ ...menuForm, tag: e.target.value })} placeholder="e.g. Popular" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="image">Image URL</Label>
-                                    <Input id="image" value={menuForm.image} onChange={(e) => setMenuForm({ ...menuForm, image: e.target.value })} placeholder="https://..." />
-                                </div>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsMenuDialogOpen(false)}>Cancel</Button>
-                            <Button
-                                className="bg-primary text-white"
-                                onClick={() => saveMenuMutation.mutate(menuForm)}
-                                disabled={saveMenuMutation.isPending}
-                            >
-                                {saveMenuMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {editingMenuItem ? "Update Item" : "Create Item"}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Blog Dialog */}
-                <Dialog open={isBlogDialogOpen} onOpenChange={setIsBlogDialogOpen}>
-                    <DialogContent className="sm:max-w-[700px]">
-                        <DialogHeader>
-                            <DialogTitle>{editingBlog ? "Edit Blog Post" : "Create New Post"}</DialogTitle>
-                            <DialogDescription>Share your Savannah stories with the world.</DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="title">Title</Label>
-                                <Input id="title" value={blogForm.title} onChange={(e) => setBlogForm({ ...blogForm, title: e.target.value })} placeholder="How to grill like a Maasai..." />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="blogAuthor">Author</Label>
-                                    <Input id="blogAuthor" value={blogForm.author} onChange={(e) => setBlogForm({ ...blogForm, author: e.target.value })} placeholder="Name" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="blogCategory">Category</Label>
-                                    <Input id="blogCategory" value={blogForm.category} onChange={(e) => setBlogForm({ ...blogForm, category: e.target.value })} placeholder="Cuisine" />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="blogImage">Featured Image URL</Label>
-                                <Input id="blogImage" value={blogForm.image} onChange={(e) => setBlogForm({ ...blogForm, image: e.target.value })} placeholder="https://..." />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="content">Content</Label>
-                                <Textarea id="content" className="min-h-[200px]" value={blogForm.content} onChange={(e) => setBlogForm({ ...blogForm, content: e.target.value })} placeholder="Write your story here..." />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsBlogDialogOpen(false)}>Cancel</Button>
-                            <Button
-                                className="bg-primary text-white"
-                                onClick={() => saveBlogMutation.mutate(blogForm)}
-                                disabled={saveBlogMutation.isPending}
-                            >
-                                {saveBlogMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {editingBlog ? "Update Post" : "Publish Post"}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Custom Message Dialog */}
-                <Dialog open={sendMessageOrderId !== null} onOpenChange={(open) => !open && setSendMessageOrderId(null)}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Send Message to Customer</DialogTitle>
-                            <DialogDescription>
-                                Send a personalized email update regarding order #{sendMessageOrderId?.slice(-4).toUpperCase()}.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                            <Label htmlFor="custom-message">Your Message</Label>
-                            <Textarea
-                                id="custom-message"
-                                value={customMessage}
-                                onChange={(e) => setCustomMessage(e.target.value)}
-                                placeholder="Type your message here..."
-                                className="min-h-[150px] mt-2"
-                            />
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setSendMessageOrderId(null)}>Cancel</Button>
-                            <Button
-                                className="bg-primary text-white"
-                                onClick={() => sendOrderMessage.mutate({ id: sendMessageOrderId!, message: customMessage })}
-                                disabled={sendOrderMessage.isPending || !customMessage.trim()}
-                            >
-                                {sendOrderMessage.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Send Email
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Analytics Tab */}
-                <TabsContent value="analytics">
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardDescription>Total Revenue</CardDescription>
-                                <CardTitle className="text-3xl font-bold">
-                                    KSh {analytics?.totalRevenue?.toLocaleString() || 0}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-xs text-muted-foreground">From all completed orders</p>
                             </CardContent>
                         </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardDescription>Total Orders</CardDescription>
-                                <CardTitle className="text-3xl font-bold">{analytics?.totalOrders || 0}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-xs text-muted-foreground">All time</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardDescription>Reservations</CardDescription>
-                                <CardTitle className="text-3xl font-bold">{analytics?.totalReservations || 0}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-xs text-muted-foreground">Total bookings</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardDescription>Newsletter</CardDescription>
-                                <CardTitle className="text-3xl font-bold">{newsletter?.length || 0}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-xs text-muted-foreground">Subscribers</p>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    <div className="grid gap-6 md:grid-cols-2 mt-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Orders by Status</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-2">
-                                    {analytics?.ordersByStatus && Object.entries(analytics.ordersByStatus).map(([status, count]: any) => (
-                                        <div key={status} className="flex justify-between items-center">
-                                            <span className="capitalize">{status.replace('_', ' ')}</span>
-                                            <span className="font-bold">{count}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Top Selling Items</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-2">
-                                    {analytics?.topItems?.map((item: any, index: number) => (
-                                        <div key={index} className="flex justify-between items-center">
-                                            <span className="text-sm">{item.name}</span>
-                                            <span className="font-bold">{item.count} sold</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </TabsContent>
-
-                {/* Settings Tab */}
-                <TabsContent value="settings">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Restaurant Settings</CardTitle>
-                            <CardDescription>Configure operational settings for your restaurant</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="space-y-2">
-                                <Label htmlFor="openingHours">Opening Hours</Label>
-                                <Input
-                                    id="openingHours"
-                                    defaultValue={settings?.openingHours || "08:00-22:00"}
-                                    placeholder="08:00-22:00"
-                                />
-                                <p className="text-xs text-muted-foreground">Format: HH:MM-HH:MM</p>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <Label>Online Ordering</Label>
-                                    <p className="text-sm text-muted-foreground">Enable or disable online ordering</p>
-                                </div>
-                                <Button variant="outline">
-                                    {settings?.isOrderingEnabled ? "Enabled" : "Disabled"}
-                                </Button>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="minOrder">Minimum Order Amount (KSh)</Label>
-                                <Input
-                                    id="minOrder"
-                                    type="number"
-                                    defaultValue={settings?.minOrderAmount || 0}
-                                    placeholder="0"
-                                />
-                            </div>
-                            <Button className="w-full">Save Settings</Button>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+                    </TabsContent>
+                </div>
             </Tabs>
         </div>
     );
