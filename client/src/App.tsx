@@ -72,7 +72,13 @@ if (!PUBLISHABLE_KEY) {
 }
 function App() {
   return (
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY} signInUrl="/auth" signUpUrl="/auth" afterSignInUrl="/dashboard">
+    <ClerkProvider 
+      publishableKey={PUBLISHABLE_KEY} 
+      signInUrl="/auth" 
+      signUpUrl="/auth" 
+      signInFallbackRedirectUrl="/dashboard"
+      signUpFallbackRedirectUrl="/dashboard"
+    >
       <QueryClientProvider client={queryClient}>
         <ThemeProvider defaultTheme="light" storageKey="savor-theme">
           <CartProvider>

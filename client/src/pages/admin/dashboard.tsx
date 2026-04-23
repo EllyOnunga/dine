@@ -167,6 +167,19 @@ export default function AdminDashboard() {
         }
     });
 
+    const updatePaymentStatus = useMutation({
+        mutationFn: async ({ id, paymentStatus }: { id: string, paymentStatus: string }) => {
+            return apiRequest("PATCH", `/api/admin/orders/${id}/payment`, { paymentStatus });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+            toast({ title: "Payment status updated" });
+        },
+        onError: (err: Error) => {
+            toast({ title: "Failed to update payment status", description: err.message, variant: "destructive" });
+        }
+    });
+
     const sendOrderMessage = useMutation({
         mutationFn: async ({ id, message }: { id: string, message: string }) => {
             return apiRequest("POST", `/api/admin/orders/${id}/message`, { message });
@@ -471,22 +484,44 @@ export default function AdminDashboard() {
                                                     </td>
                                                     <td className="py-4 px-4">
                                                         <div className="flex flex-col gap-2">
-                                                            <Select
-                                                                defaultValue={order.status}
-                                                                onValueChange={(status) => updateOrderStatus.mutate({ id: order.id, status })}
-                                                            >
-                                                                <SelectTrigger className="w-[160px] h-8 text-xs">
-                                                                    <SelectValue />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="pending">Pending</SelectItem>
-                                                                    <SelectItem value="confirmed">Confirmed</SelectItem>
-                                                                    <SelectItem value="preparing">Preparing</SelectItem>
-                                                                    <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-                                                                    <SelectItem value="delivered">Delivered</SelectItem>
-                                                                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
+                                                            <div className="space-y-1">
+                                                                <Label className="text-[10px] uppercase text-muted-foreground">Order Status</Label>
+                                                                <Select
+                                                                    defaultValue={order.status}
+                                                                    onValueChange={(status) => updateOrderStatus.mutate({ id: order.id, status })}
+                                                                >
+                                                                    <SelectTrigger className="w-[160px] h-8 text-xs">
+                                                                        <SelectValue />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        <SelectItem value="pending">Pending</SelectItem>
+                                                                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                                                                        <SelectItem value="preparing">Preparing</SelectItem>
+                                                                        <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                                                                        <SelectItem value="delivered">Delivered</SelectItem>
+                                                                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+
+                                                            <div className="space-y-1">
+                                                                <Label className="text-[10px] uppercase text-muted-foreground">Payment Status</Label>
+                                                                <Select
+                                                                    defaultValue={order.paymentStatus}
+                                                                    onValueChange={(paymentStatus) => updatePaymentStatus.mutate({ id: order.id, paymentStatus })}
+                                                                >
+                                                                    <SelectTrigger className={`w-[160px] h-8 text-xs ${order.paymentStatus === 'completed' ? 'text-emerald-600 font-bold' : ''}`}>
+                                                                        <SelectValue />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        <SelectItem value="pending">Pending</SelectItem>
+                                                                        <SelectItem value="completed">Completed</SelectItem>
+                                                                        <SelectItem value="failed">Failed</SelectItem>
+                                                                        <SelectItem value="refunded">Refunded</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
@@ -496,9 +531,6 @@ export default function AdminDashboard() {
                                                                 <Mail className="w-3 h-3" />
                                                                 Send Message
                                                             </Button>
-                                                        </div>
-                                                        <div className="mt-1 text-[10px] text-muted-foreground text-center italic">
-                                                            Current: {order.status.replace('_', ' ')}
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-4 text-right">
@@ -556,29 +588,52 @@ export default function AdminDashboard() {
                                                 </div>
                                             </div>
 
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px] uppercase text-muted-foreground">Order</Label>
+                                                    <Select
+                                                        defaultValue={order.status}
+                                                        onValueChange={(status) => updateOrderStatus.mutate({ id: order.id, status })}
+                                                    >
+                                                        <SelectTrigger className="h-9 text-xs">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="pending">Pending</SelectItem>
+                                                            <SelectItem value="confirmed">Confirmed</SelectItem>
+                                                            <SelectItem value="preparing">Preparing</SelectItem>
+                                                            <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                                                            <SelectItem value="delivered">Delivered</SelectItem>
+                                                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px] uppercase text-muted-foreground">Payment</Label>
+                                                    <Select
+                                                        defaultValue={order.paymentStatus}
+                                                        onValueChange={(paymentStatus) => updatePaymentStatus.mutate({ id: order.id, paymentStatus })}
+                                                    >
+                                                        <SelectTrigger className="h-9 text-xs">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="pending">Pending</SelectItem>
+                                                            <SelectItem value="completed">Completed</SelectItem>
+                                                            <SelectItem value="failed">Failed</SelectItem>
+                                                            <SelectItem value="refunded">Refunded</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
                                             <div className="flex gap-2">
-                                                <Select
-                                                    defaultValue={order.status}
-                                                    onValueChange={(status) => updateOrderStatus.mutate({ id: order.id, status })}
-                                                >
-                                                    <SelectTrigger className="flex-1 h-9 text-xs">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="pending">Pending</SelectItem>
-                                                        <SelectItem value="confirmed">Confirmed</SelectItem>
-                                                        <SelectItem value="preparing">Preparing</SelectItem>
-                                                        <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-                                                        <SelectItem value="delivered">Delivered</SelectItem>
-                                                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
                                                 <Button
                                                     variant="outline"
-                                                    className="h-9 px-3"
+                                                    className="flex-1 h-9 gap-2 text-xs"
                                                     onClick={() => setSendMessageOrderId(order.id)}
                                                 >
                                                     <Mail className="w-4 h-4" />
+                                                    Contact Customer
                                                 </Button>
                                             </div>
                                             <div className="text-[10px] text-muted-foreground text-center">

@@ -491,7 +491,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid status value" });
       }
 
-      const order = await storage.updateOrder(req.params.id, status);
+      const order = await storage.updateOrder(req.params.id, { status });
       if (!order) return res.status(404).json({ message: "Order not found" });
 
       // Notify customer (don't await)
@@ -523,6 +523,25 @@ export async function registerRoutes(
       res.json(order);
     } catch (err) {
       res.status(400).json({ message: "Failed to update order status" });
+    }
+  });
+
+  app.patch("/api/admin/orders/:id/payment", async (req, res) => {
+    try {
+      const { paymentStatus } = req.body;
+      if (!paymentStatus) return res.status(400).json({ message: "Payment status is required" });
+
+      const validStatuses = ['pending', 'completed', 'failed', 'refunded'];
+      if (!validStatuses.includes(paymentStatus)) {
+        return res.status(400).json({ message: "Invalid payment status value" });
+      }
+
+      const order = await storage.updateOrder(req.params.id, { paymentStatus });
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      res.json(order);
+    } catch (err) {
+      res.status(400).json({ message: "Failed to update payment status" });
     }
   });
 

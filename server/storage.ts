@@ -217,9 +217,10 @@ export class Storage {
     }
   }
 
-  async updateOrder(id: string, status: string): Promise<schema.Order | null> {
+  async updateOrder(id: string, updates: Partial<schema.Order>): Promise<schema.Order | null> {
     try {
-      const res = await db.update(schema.orders).set({ status }).where(eq(schema.orders.id, id)).returning();
+      const { items, _id, id: orderId, ...data } = updates as any;
+      const res = await db.update(schema.orders).set(data).where(eq(schema.orders.id, id)).returning();
       return res.length ? mapId(res[0]) as unknown as schema.Order : null;
     } catch {
       return null;
