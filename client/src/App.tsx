@@ -38,8 +38,12 @@ function Router() {
       <ScrollToTop />
       <Navbar />
       <Switch>
-        <ProtectedRoute path="/admin" component={AdminDashboard} adminOnly={true} />
-        <ProtectedRoute path="/dashboard" component={UserDashboard} />
+        <Route path="/admin">
+          <ProtectedRoute path="/admin" component={AdminDashboard} adminOnly={true} />
+        </Route>
+        <Route path="/dashboard">
+          <ProtectedRoute path="/dashboard" component={UserDashboard} />
+        </Route>
         <Route path="/auth" component={AuthPage} />
         <Route path="/cart" component={CartPage} />
         <Route path="/track-order" component={TrackOrderPage} />
